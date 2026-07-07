@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+data.sql
+profile-selection/
+*.log
+.DS_Store
