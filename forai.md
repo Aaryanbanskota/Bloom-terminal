@@ -350,6 +350,7 @@ Encryption files (`data/database/data.sql.enc` + `data.sql.meta`) are created by
 |---------|-------------|
 | `bloom profile` | Opens XP / perks / avatar dialog |
 | `bloom help` | Prints command reference in terminal |
+| `bloom doctor` | 🩺 Runs system diagnostic environment check |
 | `bloom intro` | Replays the intro splash screen |
 | `bloom setup` | Goes back to first-time setup page |
 | `bloom terminal` | Spawns a new Bloom Terminal window |
@@ -533,6 +534,8 @@ zenity                    (native folder picker — critical for SongPlayerWidge
 | 27 | 2026-07-16 | **Fix: music folder picker freezes app** (attempt 3 — broken) | Tried `QMetaObject.invokeMethod(worker, "pick_folder", QueuedConnection)` → **RuntimeError: No such method** because `@pyqtSlot` was missing | `song_player_widget.py` |
 | 28 | 2026-07-16 | **Fix: music folder picker** — final correct solution | Full `QThread` + `@pyqtSlot` rewrite. Two signals: `_pick_trigger → worker.pick_folder()` and `_scan_trigger → worker.scan_folder(path)`. `QMetaObject.invokeMethod` removed entirely. OS.walk also moved to worker thread. Button shows `…` + disabled while picker is open. Smooth, non-blocking, correct. | `song_player_widget.py` |
 | 29 | 2026-07-16 | **Add `install.sh`** — one-command installer for fresh clone | `install.sh` checks Python version, installs Qt system libs + zenity via apt, creates venv, installs all pip packages, generates `bloom.sh` launcher with `QT_QPA_PLATFORM=xcb` | `install.sh`, `bloom.sh` |
+| 30 | 2026-07-16 | **Bump version & universal installer updates** | Bumped version to `v0.1.0-beta` in configs, pyproject, and README. Overhauled `install.sh` to auto-detect and support `apt`, `dnf`, `pacman`, `zypper`. Registered `bloom` symlink/binary and a desktop launcher menu item (`bloom-terminal.desktop`). | `pyproject.toml`, `README.md`, `install.sh`, `bloom/core/config.py` |
+| 31 | 2026-07-16 | **Add `bloom doctor` command** | Created system check diagnostics command `bloom doctor` to print OS, python, Qt status, audio player plugins, database setup validity, dependencies, folder permissions, and active picker tools. | `bloom/terminal/terminal.py`, `forai.md` |
 
 ---
 

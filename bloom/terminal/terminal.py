@@ -303,6 +303,10 @@ class TerminalTab(QWidget):
             self.app_ref.lock_app()
             return True
 
+        if cmd == "bloom doctor":
+            self._run_doctor_diagnostic()
+            return True
+
         if cmd == "bloom intro":
             self.app_ref.show_intro()
             return True
@@ -466,9 +470,10 @@ class TerminalTab(QWidget):
                 f"  bloom browser <text>  →  🔍  Search Google for text\n"
                 f"\n"
                 f"  {sep2}\n"
-                f"  HELP\n"
+                f"  HELP & DIAGNOSTICS\n"
                 f"  {sep2}\n"
                 f"  bloom help        →  Show this reference\n"
+                f"  bloom doctor      →  🩺  Run system diagnostics check\n"
                 f"\n"
                 f"  {sep}\n"
                 f"  Sandbox root  :  {self.jail_root}\n"
@@ -480,6 +485,108 @@ class TerminalTab(QWidget):
             return True
 
         return False
+
+    def _run_doctor_diagnostic(self):
+        import sys
+        import os
+        import platform
+        import shutil
+
+        # Header
+        sep = "━" * 45
+        self._insert_colored(f"\n🌸 BLOOM DOCTOR  ─  System Diagnostics\n{sep}\n", QColor("#7c6af7"))
+
+        # 1. OS & Python
+        self._insert_colored("🖥️ OS & Python\n", QColor("#3b8eea"))
+        py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        py_path = sys.executable
+        self._insert_colored(f"  · OS Platform  :  {platform.system()} ({platform.release()})\n", QColor("#e2e8f0"))
+        self._insert_colored(f"  · Python Version:  {py_ver}\n", QColor("#e2e8f0"))
+        self._insert_colored(f"  · Python Path   :  {py_path}\n", QColor("#e2e8f0"))
+
+        # 2. Qt Libraries
+        self._insert_colored("\n🎨 Qt Libraries\n", QColor("#3b8eea"))
+        try:
+            from PyQt5.QtCore import QT_VERSION_STR
+            self._insert_colored(f"  · PyQt5        :  Installed ({QT_VERSION_STR})\n", QColor("#4ade80"))
+        except ImportError:
+            self._insert_colored("  · PyQt5        :  ❌ NOT FOUND\n", QColor("#ff6b6b"))
+
+        # 3. Audio Backend
+        self._insert_colored("\n🎵 Audio Backend\n", QColor("#3b8eea"))
+        from bloom.ui.widgets.song_player_widget import MEDIA_OK
+        if MEDIA_OK:
+            self._insert_colored("  · QtMultimedia :  ✅ Installed & Ready\n", QColor("#4ade80"))
+        else:
+            self._insert_colored(
+                "  · QtMultimedia :  ❌ Missing (Qt-backed audio player won't work)\n"
+                "    Tip          :  Run 'pip install PyQt5-Qt5' or install python3-pyqt5.qtmultimedia\n",
+                QColor("#ff6b6b")
+            )
+
+        # 4. Database Status
+        self._insert_colored("\n💾 Database Status\n", QColor("#3b8eea"))
+        db_valid = False
+        if self.app_ref.db_conn:
+            try:
+                cur = self.app_ref.db_conn.cursor()
+                cur.execute("SELECT name, base_dir FROM user_data LIMIT 1;")
+                row = cur.fetchone()
+                db_valid = True
+                self._insert_colored(f"  · DB Connection:  ✅ Active\n", QColor("#4ade80"))
+                if row:
+                    self._insert_colored(f"  · Active Profile:  {row[0]}\n", QColor("#e2e8f0"))
+                else:
+                    self._insert_colored("  · Active Profile:  ❌ No setup data in table\n", QColor("#ff6b6b"))
+            except Exception as e:
+                self._insert_colored(f"  · DB Integrity :  ❌ Corrupted ({e})\n", QColor("#ff6b6b"))
+        else:
+            self._insert_colored("  · DB Connection:  ❌ No Connection\n", QColor("#ff6b6b"))
+
+        # 5. Sandbox Folder
+        self._insert_colored("\n🔒 Sandbox Workspace\n", QColor("#3b8eea"))
+        self._insert_colored(f"  · Sandbox path :  {self.jail_root}\n", QColor("#e2e8f0"))
+        if os.path.isdir(self.jail_root):
+            self._insert_colored("  · Status       :  ✅ Exists & Valid\n", QColor("#4ade80"))
+            # Permissions check
+            readable = os.access(self.jail_root, os.R_OK)
+            writable = os.access(self.jail_root, os.W_OK)
+            perm_str = []
+            if readable: perm_str.append("Read")
+            if writable: perm_str.append("Write")
+            self._insert_colored(f"  · Permissions  :  {', '.join(perm_str) if perm_str else 'None'}\n", QColor("#e2e8f0"))
+        else:
+            self._insert_colored("  · Status       :  ❌ Directory missing!\n", QColor("#ff6b6b"))
+
+        # 6. Missing Dependencies
+        self._insert_colored("\n⚙️ Core Dependencies\n", QColor("#3b8eea"))
+        deps = [
+            ("ptyprocess", "ptyprocess"),
+            ("pycryptodome", "Cryptodome"),
+            ("customtkinter", "customtkinter"),
+            ("Flask", "flask"),
+            ("psutil", "psutil"),
+            ("requests", "requests")
+        ]
+        for name, lib in deps:
+            try:
+                __import__(lib)
+                self._insert_colored(f"  · {name:<13}:  ✅ Installed\n", QColor("#4ade80"))
+            except ImportError:
+                self._insert_colored(f"  · {name:<13}:  ❌ MISSING\n", QColor("#ff6b6b"))
+
+        # 7. Utilities & Environment
+        self._insert_colored("\n🛠️ Picker Utilities\n", QColor("#3b8eea"))
+        zenity_ok = bool(shutil.which("zenity"))
+        kdialog_ok = bool(shutil.which("kdialog"))
+        self._insert_colored(f"  · Zenity (GTK) :  {'✅ Available' if zenity_ok else '❌ Missing (falling back)'}\n", QColor("#4ade80" if zenity_ok else "#ffd700"))
+        self._insert_colored(f"  · Kdialog (KDE):  {'✅ Available' if kdialog_ok else '❌ Missing (falling back)'}\n", QColor("#4ade80" if kdialog_ok else "#ffd700"))
+
+        # Display Wayland/X11 vars
+        self._insert_colored(f"  · Platform QPA :  {os.environ.get('QT_QPA_PLATFORM', 'default')}\n", QColor("#e2e8f0"))
+
+        self._insert_colored(f"{sep}\nDiagnostics completed successfully.\n\n", QColor("#7c6af7"))
+        self._write_prompt()
 
     def _launch_extra_tool(self, script: str, label: str):
         import subprocess, threading
