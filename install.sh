@@ -59,7 +59,7 @@ RELEASE_JSON=$(curl -fsSL "$API_URL" 2>/dev/null || echo "")
 TAG_NAME=$(echo "$RELEASE_JSON" | grep -m 1 '"tag_name":' | cut -d '"' -f 4 || echo "")
 TARBALL_URL=$(echo "$RELEASE_JSON" | grep -m 1 '"tarball_url":' | cut -d '"' -f 4 || echo "")
 
-# Graceful fallback if no release yet or API rate limit reached
+# Graceful fallback to main branch tarball URL
 if [ -z "$TARBALL_URL" ] || [ "$TARBALL_URL" = "null" ]; then
     TAG_NAME="v0.1.0-beta"
     TARBALL_URL="https://github.com/Aaryanbanskota/Bloom-terminal/archive/refs/heads/main.tar.gz"
@@ -71,11 +71,35 @@ INSTALL_DIR="$HOME/.bloom-terminal"
 mkdir -p "$INSTALL_DIR"
 
 TEMP_TAR="/tmp/bloom-${TAG_NAME}.tar.gz"
-curl -fsSL -o "$TEMP_TAR" "$TARBALL_URL"
+DOWNLOAD_SUCCESS=true
 
-# Extract and clean up
-tar -xzf "$TEMP_TAR" -C "$INSTALL_DIR" --strip-components=1
-rm -f "$TEMP_TAR"
+# Try to download release archive
+if ! curl -fsSL -o "$TEMP_TAR" "$TARBALL_URL"; then
+    DOWNLOAD_SUCCESS=false
+fi
+
+if [ "$DOWNLOAD_SUCCESS" = "true" ] && [ -f "$TEMP_TAR" ]; then
+    # Extract archive
+    tar -xzf "$TEMP_TAR" -C "$INSTALL_DIR" --strip-components=1
+    rm -f "$TEMP_TAR"
+else
+    # Fallback to git clone if download failed (e.g., due to private repo auth)
+    echo -e "${YELLOW}⚠ Archive download not accessible. Falling back to git clone...${RESET}"
+    if ! command -v git &>/dev/null; then
+        echo -e "${YELLOW}⚠ git is missing. Installing git...${RESET}"
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get update -y && sudo apt-get install -y git
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y git
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -S --noconfirm git
+        elif command -v zypper &>/dev/null; then
+            sudo zypper install -y git
+        fi
+    fi
+    rm -rf "$INSTALL_DIR"
+    git clone --depth 1 git@github.com:Aaryanbanskota/Bloom-terminal.git "$INSTALL_DIR"
+fi
 
 # ── 4. Run Core Installer ─────────────────────────────────────────────────────
 echo -e "${GREEN}✓${RESET} Installing..."
