@@ -62,8 +62,13 @@ Verified commands
     Status: INTERACTIVE / NEEDS GUI
     Evidence: handler opens a dialog; it could not be fully completed in a headless test.
 
+13. bash install.sh (Bootstrap installer)
+    Status: WORKS
+    Evidence: Bootstraps dependencies, queries GitHub release, pulls latest release archive, extracts it, and triggers inner installation setup successfully.
+
 Overall result
 --------------
 - Built-in Bloom command handlers: mostly working.
 - Main GUI launch: not working in the current environment due Qt startup issue.
+- Bootstrap installer script: successfully verified.
 - Interactive commands that require a visible UI should be tested on a normal desktop session.
