@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Python-3.8%2B-ff6eb4?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.8+"/>
   </a>
   <a href="https://github.com/Aaryanbanskota/Bloom-terminal/stargazers">
-    <img src="https://img.shields.io/badge/Stars-active-c084fc?style=for-the-badge&logo=github" alt="Stars"/>
+    <img src="https://img.shields.io/badge/Stars-⭐%20Give%20a%20Star-c084fc?style=for-the-badge&logo=github" alt="Stars"/>
   </a>
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-ff6eb4?style=for-the-badge" alt="Platform"/>
 </p>
@@ -48,60 +48,10 @@ Bloom Terminal is a **premium Python desktop GUI terminal** that looks and feels
 - 🎮 **RPG-style gamification** — earn XP, level up, unlock visual perks
 - 🔒 **Directory sandbox** — jail the shell inside a user-chosen folder
 - 📊 **Live dashboard** — real-time weather, battery, CPU, music player & more
-- 👤 **Avatar & profile editor** — circular crop, preset avatars, XP progress
+- 👤 **Avatar & profile editor** — circular crop, preset avatars, XP progress ring
 - 🛡️ **AES-256-GCM encryption** — lock your session and encrypt data on disk
-
----
-
-## 🏗️ Architecture
-
-### App Flow
-
-```mermaid
-graph TD
-    A[run.py] --> B[bloom/app.py]
-    B --> C[SetupWidget]
-    B --> D[IntroDashboard]
-    B --> E[TerminalTab]
-    D --> F[WeatherWidget]
-    D --> G[SongPlayerWidget]
-    D --> H[BatteryCpuWidget]
-    D --> I[SettingsDialog]
-    E --> J[ptyprocess]
-    I --> K[SecurityManager]
-```
-
-### Widget Hierarchy
-
-```mermaid
-graph TD
-    App[BloomTerminalApp] --> Stack[QStackedWidget]
-    Stack --> Setup[SetupWidget]
-    Stack --> Intro[IntroDashboard]
-    Stack --> Terminal[Terminal Tab Widget]
-    
-    Intro --> Weather[WeatherWidget]
-    Intro --> Player[SongPlayerWidget]
-    Intro --> Stats[BatteryCpuWidget]
-    Intro --> Gear[_GearButton / SettingsDialog]
-```
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Shell as TerminalTab (PTY)
-    participant UI as App Main Window
-    participant DB as SQLite Database
-
-    User->>Shell: Types Command
-    Shell->>Shell: Executes via ptyprocess
-    Shell-->>UI: Output Received (Sentinel matches exit code)
-    UI->>DB: Add XP (Success/Fail stats)
-    DB-->>UI: Database Updated
-    UI-->>User: Refresh stats UI (XP, Level)
-```
+- 🎨 **Full ANSI color rendering** — `ls`, `git`, `grep`, `python` output in rich color
+- 🖥️ **True PTY backend** — real interactive shell with password masking & sudo support
 
 ---
 
@@ -129,6 +79,8 @@ bloom
 
 Or search **Bloom Terminal** from your desktop's application launcher.
 
+> The installer automatically detects your Linux distro, installs system dependencies, sets up a Python virtual environment, registers the `bloom` command globally, and creates a desktop launcher. No manual steps needed.
+
 ### 🔧 Manual Setup (Developers)
 
 If you'd like to clone the repository and run Bloom Terminal manually:
@@ -140,15 +92,13 @@ cd Bloom-terminal
 
 # 2. Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
 # 4. Run
 python run.py
-# or
-python -m bloom
 ```
 
 ---
@@ -178,6 +128,8 @@ Earn XP and level up as you use your terminal:
 📈 Level formula       →  level = int((xp / 100) ** 0.6) + 1
 ```
 
+XP and level persist across sessions in the SQLite database, with a QSettings cache as backup. The intro dashboard updates in real-time as you earn XP.
+
 **Perk unlock milestones:** `1 → 10 → 15 → 20 → 25 → 30 → 40 → 50 → 60 → 70 → 80 → 90 → 100` *(Bloom Architect)*
 
 ### 🔒 Security & Sandboxing
@@ -192,8 +144,19 @@ Earn XP and level up as you use your terminal:
 - `ptyprocess.PtyProcessUnicode.spawn()` — a real PTY session (not a fake subprocess)
 - PTY ECHO disabled via `termios` — no double-printed commands
 - Non-blocking PTY fd via `fcntl` + `QSocketNotifier` for Qt event-loop integration
-- ANSI escape sequences stripped via regex before display
+- **Full ANSI SGR color rendering** — standard 8/16, bright (90-97), 256-color (`38;5;n`), true-color (`38;2;r;g;b`), bold, italic, underline, reverse video
 - Shell auto-detected: `$SHELL` → `/bin/bash` → `/bin/sh`
+
+### 🖱️ Terminal UX
+
+| Feature | Details |
+|---------|---------|
+| `clear` / `cls` | Instantly wipes the terminal (intercepted natively — no ANSI dependency) |
+| `exit` / `logout` | Gracefully closes the current tab |
+| ↑ / ↓ arrows | Navigate command history |
+| `Ctrl+C` | Send interrupt signal to running process |
+| `Ctrl+Shift+C/V` | Copy / Paste |
+| `Home` key | Jump to start of input line |
 
 ---
 
@@ -206,6 +169,7 @@ Earn XP and level up as you use your terminal:
 | `bloom intro` | Replay the live intro dashboard |
 | `bloom setup` | Go back to first-time setup page |
 | `bloom lock` | Lock session & encrypt database |
+| `bloom doctor` | Run system diagnostics (OS, Python, Qt, DB, audio) |
 | `bloom terminal` | Spawn a new Bloom Terminal window |
 | `bloom tab` | Open a new shell tab |
 | `bloom browser <url/text>` | Open URL or Google-search text in browser |
@@ -216,6 +180,67 @@ Earn XP and level up as you use your terminal:
 
 ---
 
+## 🏗️ Architecture
+
+### App Flow
+
+```mermaid
+graph TD
+    A[run.py] --> B[bloom/app.py]
+    B --> C[SetupWidget]
+    B --> D[IntroDashboard]
+    B --> E[TerminalTab]
+    D --> F[WeatherWidget]
+    D --> G[SongPlayerWidget]
+    D --> H[BatteryCpuWidget]
+    D --> I[SettingsDialog]
+    E --> J[ptyprocess PTY]
+    E --> K[ANSI SGR Parser]
+    I --> L[SecurityManager]
+```
+
+### Installer Flow
+
+```mermaid
+graph TD
+    A["curl install.sh | bash"] --> B[Detect OS]
+    B --> C[Install curl + tar]
+    C --> D[Query GitHub Releases API]
+    D --> E{Release found?}
+    E -- Yes --> F[Download .tar.gz]
+    E -- No --> G[git clone fallback]
+    F --> H[Extract to ~/.bloom-terminal]
+    G --> H
+    H --> I[Run scripts/setup.sh]
+    I --> J[Install system deps]
+    J --> K[Create Python venv]
+    K --> L[pip install packages]
+    L --> M[Register bloom command]
+    M --> N[Create .desktop launcher]
+    N --> O[Done ✅]
+```
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Shell as TerminalTab (PTY)
+    participant ANSI as ANSI Parser
+    participant UI as App Main Window
+    participant DB as SQLite Database
+
+    User->>Shell: Types Command
+    Shell->>Shell: Executes via ptyprocess
+    Shell-->>ANSI: Raw PTY output with ANSI codes
+    ANSI-->>UI: Colored QTextCharFormat chunks
+    UI->>DB: add_xp() → update_user_stats()
+    DB-->>UI: rowcount check → upsert if needed
+    UI-->>User: Refresh XP/Level on intro dashboard
+```
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -223,11 +248,12 @@ python-bloom/
 ├── bloom/                        # Main Python package
 │   ├── app.py                    # Main window, tabs, XP, page navigation
 │   ├── core/                     # Config, constants, logger, paths
-│   ├── terminal/                 # PTY shell backend + bloom command hooks
+│   ├── terminal/                 # PTY shell backend + ANSI color parser + bloom commands
 │   ├── ui/                       # All PyQt5 widgets, dialogs, windows
-│   │   ├── widgets/              # SetupWidget, AvatarCropper
-│   │   └── dialogs/              # ProfileDialog
-│   ├── storage/                  # SQLite database layer
+│   │   ├── widgets/              # SetupWidget, IntroDashboard, ProfileWidget
+│   │   └── dialogs/              # ProfileDialog, SettingsDialog
+│   ├── storage/                  # SQLite database layer (with upsert XP save)
+│   ├── security/                 # AES-256-GCM encryption + SecurityManager
 │   ├── services/                 # CineStream, Share, USB, Vault tools
 │   ├── ai/                       # AI integration (future)
 │   ├── learning/                 # Gamified learning system (future)
@@ -235,13 +261,17 @@ python-bloom/
 │
 ├── data/                         # Runtime-generated (git-ignored)
 │   ├── database/data.sql         # SQLite DB (created on first run)
-│   └── logs/bloom.log            # App log
+│   ├── logs/bloom.log            # App log
+│   └── reports/command_report.txt # Command verification report
 │
 ├── docs/                         # Documentation & diagrams
-│   └── diagrams/                 # Architecture, data flow, widget hierarchy
+│   ├── setup/installation.md     # Full installation guide
+│   └── development/changelog.md  # Version changelog
 │
-├── tests/                        # Unit & integration tests
-├── bloom_runner.sh               # 🚀 Primary launcher script
+├── scripts/
+│   └── setup.sh                  # Core installer (runs inside ~/.bloom-terminal)
+│
+├── install.sh                    # 🌸 Bootstrap installer (one-command entry point)
 ├── run.py                        # Entry point
 ├── pyproject.toml                # Package metadata
 └── requirements.txt              # Runtime dependencies
@@ -259,6 +289,7 @@ python-bloom/
 | `psutil` | ≥ 5.9.0 | Battery, CPU, process monitoring |
 | `customtkinter` | ≥ 5.0.0 | Enhanced Tkinter widgets (services) |
 | `Flask` | ≥ 2.0.0 | CineStream media server |
+| `requests` | ≥ 2.28.0 | Weather API & HTTP utilities |
 
 ---
 
@@ -297,11 +328,13 @@ WEATHER_API_KEY = "your_key_here"
 | `id` | INTEGER | Primary key (autoincrement) |
 | `name` | TEXT | User display name |
 | `base_dir` | TEXT | Sandbox root folder path |
-| `xp` | INTEGER | Total XP earned |
+| `xp` | INTEGER | Total XP earned (persists across sessions) |
 | `level` | INTEGER | Derived from XP formula |
 | `success_cmds` | INTEGER | Count of successful commands |
 | `failed_cmds` | INTEGER | Count of failed commands |
 | `avatar` | TEXT | Path to current avatar image |
+
+> XP and level are saved via an **upsert** — even if no setup row exists yet, data is never lost.
 
 ---
 
