@@ -566,6 +566,8 @@ The installation process is split into two components to facilitate a seamless, 
 | 32 | 2026-07-16 | **Refactor Installer into Bootstrap and Core** | Split the single repository installer into a lightweight bootstrapping `install.sh` and a core installer `scripts/setup.sh` inside the code folder. | `install.sh`, `scripts/setup.sh` |
 | 33 | 2026-07-16 | **Add Release Downloader & Git Clone Fallback** | Updated `install.sh` to download/extract release archives automatically and fall back to `git clone` if downloading fails (due to testing on private repos). | `install.sh` |
 | 34 | 2026-07-16 | **Update Documentation & Release Tags** | Updated `README.md` and `forai.md` to document the new installer. Created and updated the `v0.1.0-beta` git release tag. | `README.md`, `forai.md`, Git |
+| 35 | 2026-07-16 | **Fix: `clear` and `exit` commands** | Intercepted `clear`/`cls` natively in `eventFilter` to wipe the `QTextEdit` directly (ANSI clear codes were being stripped). Intercepted `exit`/`logout` to gracefully close the current tab via `close_tab()`. | `bloom/terminal/terminal.py` |
+| 36 | 2026-07-16 | **Fix: XP/Level never saves or loads** | Fixed silent no-op in `update_user_stats` — added upsert fallback so data is written even before first setup. Fixed `load_user_data` to restore XP/level from DB even when `base_dir` is missing. Fixed `ProfileWidget.refresh()` to display level alongside XP. Added live `refresh_user()` call in `add_xp()` so the intro dashboard updates in real-time after every command. | `bloom/storage/database.py`, `bloom/app.py`, `bloom/ui/widgets/intro_dashboard.py` |
 
 ---
 

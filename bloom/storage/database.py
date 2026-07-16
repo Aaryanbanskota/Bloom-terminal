@@ -44,4 +44,11 @@ def update_user_stats(conn, xp, level, success, failed, avatar):
     cursor.execute('''UPDATE user_data SET 
         xp = ?, level = ?, success_cmds = ?, failed_cmds = ?, avatar = ?
     ''', (xp, level, success, failed, avatar))
+    # If no row exists yet (first run before setup), insert one so data is never lost
+    if cursor.rowcount == 0:
+        cursor.execute(
+            '''INSERT INTO user_data (name, base_dir, xp, level, success_cmds, failed_cmds, avatar)
+               VALUES (?, ?, ?, ?, ?, ?, ?)''',
+            ("", "", xp, level, success, failed, avatar)
+        )
     conn.commit()

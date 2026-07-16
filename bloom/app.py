@@ -228,10 +228,15 @@ class BloomTerminalApp(QWidget):
 
         try:
             data = get_user_data(self.db_conn)
-            if data and data[0] and data[1] and os.path.isdir(data[1]):
+            if data:
                 self.user_name, self.base_dir, self.xp, self.level, \
                     self.succ, self.fail, self.avatar = data
-                self.has_setup = True
+                # Validate the sandbox dir; fall back to home if gone
+                if not self.base_dir or not os.path.isdir(self.base_dir):
+                    self.has_setup = False
+                else:
+                    self.has_setup = True
+                # Always persist the latest values to QSettings cache
                 self.cache_user_data()
             else:
                 self.user_name = self.base_dir = self.avatar = ""
@@ -451,6 +456,14 @@ class BloomTerminalApp(QWidget):
                               self.succ, self.fail, self.avatar)
         # Always keep the QSettings cache up to date
         self.cache_user_data()
+        # Refresh live dashboard profile widget so XP/level update in real-time
+        if hasattr(self, '_intro') and self._intro is not None:
+            self._intro.refresh_user(
+                self.user_name,
+                self.xp,
+                self.level,
+                self.avatar,
+            )
 
     def _open_settings(self):
         """Open the settings dialog (gear button callback)."""

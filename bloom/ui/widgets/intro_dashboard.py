@@ -176,7 +176,7 @@ class ProfileWidget(QWidget):
 
     def refresh(self, name, xp, level):
         self.name_lbl.setText(f"User: {name}")
-        self.xp_lbl.setText(f"xp: {xp}")
+        self.xp_lbl.setText(f"xp: {xp}  ·  lvl: {level}")
 
 # ── Running Programs Widget ───────────────────────────────────────────────
 class RunningProgramsWidget(QWidget):

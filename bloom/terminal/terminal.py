@@ -776,6 +776,21 @@ class TerminalTab(QWidget):
                 self._write_prompt()
                 return True
 
+            # ── Intercept: clear ─────────────────────────────────────────────
+            if command.strip().lower() in ("clear", "cls"):
+                self.text_area.clear()
+                self._write_prompt()
+                return True
+
+            # ── Intercept: exit / logout ──────────────────────────────────────
+            if command.strip().lower() in ("exit", "logout"):
+                # Close this tab gracefully via the parent app
+                if hasattr(self.app_ref, 'tab_widget'):
+                    idx = self.app_ref.tab_widget.indexOf(self)
+                    if idx >= 0:
+                        self.app_ref.close_tab(idx)
+                return True
+
             tokens = command.split()
             if tokens and tokens[0].lower() == "bloom":
                 if not self._handle_bloom_command(command):
