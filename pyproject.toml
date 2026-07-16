@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bloom-terminal"
+version = "0.1.0"
+description = "A gamified, sandboxed desktop terminal emulator using PyQt5."
+readme = "README.md"
+authors = [
+    { name = "Aaryan Banskota" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "PyQt5>=5.15.0",
+    "PyQt6>=6.0.0",
+    "pycryptodome>=3.10.0",
+    "customtkinter>=5.0.0",
+    "Flask>=2.0.0",
+    "ptyprocess>=0.7.0"
+]
+requires-python = ">=3.8"
+
+[project.scripts]
+bloom-terminal = "bloom.app:main"

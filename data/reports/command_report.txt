@@ -1,0 +1,69 @@
+Bloom project command report
+============================
+Date: 2026-07-08
+Environment: Linux, Python 3.12.3, virtual environment present
+
+Summary
+-------
+- Dependencies required by the app are installed and importable.
+- The built-in Bloom command handlers were exercised successfully in a headless test harness.
+- The main launcher script starts but the GUI application does not fully launch in this environment because of a Qt thread/socket error.
+
+Verified commands
+-----------------
+1. bash bloom_runner.sh
+   Status: FAIL in this environment
+   Evidence: launcher started, activated venv, and printed:
+   "QSocketNotifier: Can only be used with threads started with QThread"
+   Meaning: the app did not launch successfully here.
+
+2. bloom help
+   Status: WORKS
+   Evidence: handler executed and printed the Bloom help reference.
+
+3. bloom profile
+   Status: WORKS
+   Evidence: handler executed and called the profile action.
+
+4. bloom intro
+   Status: WORKS
+   Evidence: handler executed and called the intro action.
+
+5. bloom setup
+   Status: WORKS
+   Evidence: handler executed and called the setup action.
+
+6. bloom terminal
+   Status: WORKS
+   Evidence: handler executed and triggered a new Bloom window launch.
+
+7. bloom tab
+   Status: WORKS
+   Evidence: handler executed and triggered a new tab action.
+
+8. bloom -server
+   Status: WORKS (handler path)
+   Evidence: handler executed and launched the CineStream script path.
+
+9. bloom -share
+   Status: WORKS (handler path)
+   Evidence: handler executed and launched the file share script path.
+
+10. bloom lockfile
+    Status: WORKS (handler path)
+    Evidence: handler executed and launched the vault script path.
+
+11. bloom browser https://example.com
+    Status: WORKS (handler path)
+    Evidence: handler executed and prepared the URL for browser launch.
+    Note: actual browser opening depends on the desktop environment and xdg-open availability.
+
+12. bloom -usb
+    Status: INTERACTIVE / NEEDS GUI
+    Evidence: handler opens a dialog; it could not be fully completed in a headless test.
+
+Overall result
+--------------
+- Built-in Bloom command handlers: mostly working.
+- Main GUI launch: not working in the current environment due Qt startup issue.
+- Interactive commands that require a visible UI should be tested on a normal desktop session.
