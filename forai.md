@@ -1,7 +1,8 @@
 # Bloom Terminal — AI Context File (`forai.md`)
 
-> This file is the single source of truth for any AI or developer picking up this project.
+> This file is the **single source of truth** for any AI or developer picking up this project.
 > Updated after every structural or functional change.
+> Last updated: **2026-07-16** (Session: music folder fix + threading overhaul + install.sh)
 
 ---
 
@@ -12,7 +13,11 @@ It looks like a real interactive shell (powered by `ptyprocess` PTY) but adds:
 - 🎮 RPG-style gamification — XP, levels, unlockable perks
 - 🔒 Directory sandbox that jails the shell inside a user-chosen folder
 - 👤 Avatar/profile editor with circular crop and preset avatars
+- 🎵 Music player widget with non-blocking folder picker (QThread)
+- 🌤 Live weather widget (wttr.in, no API key)
+- 📊 System analytics widget (battery + CPU arc gauges via psutil)
 - 🚀 Bloom built-in commands for launching extra tools
+- 🔐 Encryption support (`bloom lock`, Ghost Vault Pro)
 
 ---
 
@@ -50,7 +55,11 @@ python-bloom/
 │   │   ├── widgets/
 │   │   │   ├── __init__.py
 │   │   │   ├── setup_widget.py          # First-time setup screen (name + folder picker)
-│   │   │   └── avatar_cropper.py        # Custom QPainter circular image cropper
+│   │   │   ├── avatar_cropper.py        # Custom QPainter circular image cropper
+│   │   │   ├── intro_dashboard.py       # Live intro dashboard (weather/profile/music/stats)
+│   │   │   ├── song_player_widget.py    # Music player — non-blocking QThread folder picker ⭐
+│   │   │   ├── system_stats_widget.py   # Battery + CPU arc gauges (psutil)
+│   │   │   └── weather_widget.py        # Live weather via wttr.in (no API key)
 │   │   ├── dialogs/
 │   │   │   ├── __init__.py
 │   │   │   └── profile_dialog.py        # Profile/XP/perks dialog + avatar editor
@@ -77,47 +86,33 @@ python-bloom/
 │   │   ├── usb_mover.py                 # bloom -usb     → USB file mover (Porter)
 │   │   └── vault.py                     # bloom lockfile → Ghost Vault Pro (file encryption)
 │   │
+│   ├── security/                        # Security utilities
+│   │   └── __init__.py
+│   │
 │   ├── ai/                              # AI integration stubs (future)
-│   │   ├── __init__.py
-│   │   ├── memory/       __init__.py
-│   │   ├── prompts/      __init__.py
-│   │   ├── providers/    __init__.py
-│   │   └── tools/        __init__.py
+│   │   └── __init__.py
 │   │
 │   ├── learning/                        # Gamified learning system (future)
-│   │   ├── __init__.py
-│   │   ├── achievements/ __init__.py
-│   │   ├── lessons/      __init__.py
-│   │   ├── progress/     __init__.py
-│   │   └── quizzes/      __init__.py
+│   │   └── __init__.py
 │   │
 │   ├── plugins/                         # Plugin system (future)
-│   │   ├── __init__.py
-│   │   └── builtin/      __init__.py
+│   │   └── __init__.py
 │   │
 │   ├── profile/                         # Profile data helpers (future)
 │   │   └── __init__.py
 │   │
 │   ├── reports/                         # Reporting subsystem (future)
-│   │   ├── __init__.py
-│   │   ├── ai/           __init__.py
-│   │   ├── analytics/    __init__.py
-│   │   ├── command/      __init__.py
-│   │   ├── crashes/      __init__.py
-│   │   └── exports/      __init__.py
-│   │
-│   ├── security/                        # Security utilities (future)
 │   │   └── __init__.py
 │   │
 │   ├── utils/                           # Shared utility helpers (future)
 │   │   └── __init__.py
 │   │
 │   └── assets/                          # Static resources
-│       ├── bloom-terminal-logo.png       # App window + dock icon
-│       ├── bloom-art-raw.png             # Watermark drawn behind terminal output
+│       ├── bloom-terminal-logo.png
+│       ├── bloom-art-raw.png
 │       ├── bloom-flower.png
 │       ├── butterfly.png
-│       └── avatars/                      # Preset avatar images + saved_avatar.png
+│       └── avatars/
 │           ├── saved_avatar.png
 │           ├── brakingbad-profile.jpg
 │           ├── dog-profile.png
@@ -130,7 +125,9 @@ python-bloom/
 │
 ├── data/                                # Runtime-generated data (git-ignored)
 │   ├── database/
-│   │   └── data.sql                     # SQLite database (created on first run)
+│   │   ├── data.sql                     # SQLite database (created on first run)
+│   │   ├── data.sql.enc                 # Encrypted DB backup (AES via pycryptodome)
+│   │   └── data.sql.meta               # Encryption metadata file
 │   ├── logs/
 │   │   └── bloom.log                    # App log (created by bloom.core.logger)
 │   ├── cache/
@@ -140,15 +137,16 @@ python-bloom/
 │   └── backups/
 │
 ├── docs/                                # Documentation
-│   ├── screenshots/                     # UI screenshots
+│   ├── screenshots/
+│   │   └── open-music-error.png         # Bug evidence screenshot (music folder crash)
 │   ├── api/
 │   ├── architecture/
 │   ├── development/
 │   ├── diagrams/
 │   ├── setup/
-│   └── problem.md
+│   └── problem.md                       # Static audit report
 │
-├── tests/                               # Test suite
+├── tests/
 │   ├── unit/
 │   │   ├── test_pty.py
 │   │   └── test_sudo.py
@@ -158,12 +156,10 @@ python-bloom/
 │   └── fixtures/
 │
 ├── examples/
-│   ├── plugins/
-│   └── tutorials/
-│
-├── scripts/                             # Dev/ops helper scripts
-│
-├── bloom_runner.sh                      # Primary launcher (creates venv, installs deps)
+├── scripts/
+├── install.sh                           # ⭐ One-command installer (new)
+├── bloom.sh                             # ⭐ Generated launcher (sets QT_QPA_PLATFORM=xcb)
+├── bloom_runner.sh                      # Legacy launcher (creates venv, installs deps)
 ├── run.py                               # Entry point: from bloom.app import main
 ├── pyproject.toml                       # Package metadata and build config
 ├── requirements.txt                     # Runtime dependencies
@@ -177,18 +173,35 @@ python-bloom/
 
 ## How to Run
 
-### Easy way (recommended)
+### ⭐ Quickest way (fresh clone, any terminal)
 ```bash
-./bloom_runner.sh
+git clone https://github.com/Aaryanbanskota/Bloom-terminal.git
+cd Bloom-terminal
+bash install.sh
+./bloom.sh
 ```
-Creates venv, installs all deps, detects Wayland vs X11, launches app.
+`install.sh` handles:
+- Python 3.8+ check
+- Qt system libs + zenity (via `apt-get`)
+- Python venv creation
+- All pip packages
+- Generates `bloom.sh` launcher (sets `QT_QPA_PLATFORM=xcb`)
 
 ### Manual way
 ```bash
 source venv/bin/activate
-python run.py
-# or
+export QT_QPA_PLATFORM=xcb    # suppresses Wayland warning
 python -m bloom
+```
+
+### VS Code users
+Add to `.vscode/settings.json`:
+```json
+{
+  "terminal.integrated.env.linux": {
+    "QT_QPA_PLATFORM": "xcb"
+  }
+}
 ```
 
 ---
@@ -200,7 +213,7 @@ run.py
   └─→ bloom.app.main()
         └─→ QApplication + BloomTerminalApp(QWidget)
               ├─→ SetupWidget          (first-time setup screen)
-              ├─→ IntroScreen          (60s splash, click to skip)
+              ├─→ IntroDashboard       (live splash: weather/profile/music/stats)
               └─→ Terminal page
                     ├─→ BloomTabBar    (custom pill-shaped QPainter tab bar)
                     └─→ TerminalTab(s)
@@ -221,7 +234,70 @@ run.py
 | `bloom/terminal/terminal.py` | PTY shell, ANSI stripping, sentinel parsing, bloom commands |
 | `bloom/ui/widgets/setup_widget.py` | First-run name/folder setup |
 | `bloom/ui/widgets/avatar_cropper.py` | Circular pan+zoom avatar editor |
+| `bloom/ui/widgets/intro_dashboard.py` | Live 3-column intro dashboard |
+| `bloom/ui/widgets/song_player_widget.py` | **Non-blocking** music player (QThread) |
+| `bloom/ui/widgets/system_stats_widget.py` | Battery + CPU live arc gauges |
+| `bloom/ui/widgets/weather_widget.py` | wttr.in weather fetch |
 | `bloom/ui/dialogs/profile_dialog.py` | XP/perks/avatar dialog |
+
+---
+
+## SongPlayerWidget — Threading Architecture (Critical)
+
+> **This is the most complex widget. Read this before touching it.**
+
+### Problem history
+1. Original: `QFileDialog` with `DontUseNativeDialog` → rendered Qt dialog inside app window → **crash / UI corruption**
+2. Fix attempt 1: `QFileDialog.getExistingDirectory()` → still used Qt dialog renderer on some systems → **same crash**
+3. Fix attempt 2: `subprocess.run(["zenity", ...])` on main thread → **blocks Qt event loop → entire app freezes**
+4. Fix attempt 3: `QMetaObject.invokeMethod(worker, "pick_folder", ...)` → **RuntimeError: No such method** (PyQt5 requires `@pyqtSlot` decorator for meta-object discovery)
+5. ✅ **Final fix**: Pure signal/slot cross-thread dispatch with `@pyqtSlot` decorators
+
+### Final threading model
+```
+Main thread emits _pick_trigger signal
+    ↓ (Qt.QueuedConnection → executes on worker thread)
+_FolderWorker.pick_folder()   ← @pyqtSlot()
+    runs: subprocess.run(["zenity", ...])   ← blocks worker thread only
+    emits: folder_picked(path_str)
+    ↓ (auto QueuedConnection → executes on main thread)
+SongPlayerWidget._on_folder_picked(folder)
+    emits: _scan_trigger(folder)
+    ↓ (Qt.QueuedConnection → executes on worker thread)
+_FolderWorker.scan_folder(folder)   ← @pyqtSlot(str)
+    runs: os.walk(folder)   ← blocks worker thread only
+    emits: songs_ready(list_of_paths)
+    ↓ (auto QueuedConnection → executes on main thread)
+SongPlayerWidget._on_songs_ready(songs)
+    updates UI, loads playlist
+```
+
+### Key rules
+- `@pyqtSlot()` / `@pyqtSlot(str)` decorators are **mandatory** on all worker slots — without them PyQt5's meta-object system cannot route the calls across threads
+- `Qt.QueuedConnection` on the `main → worker` signal connections ensures the slot runs on the worker's thread (not the main thread)
+- `worker → main` connections are auto-QueuedConnection (PyQt5 detects the thread boundary)
+- `QMetaObject.invokeMethod` is **NOT used anywhere** — it requires `@pyqtSlot` AND doesn't easily accept arguments in PyQt5
+- `QFileDialog` is **NOT used** — it renders a Qt widget that corrupts the widget tree on some Wayland/X11 hybrid setups
+
+### Folder picker fallback chain
+```
+1. zenity  (GTK — GNOME/Ubuntu)     subprocess.run(["zenity", "--file-selection", ...])
+2. kdialog (KDE/Plasma)             subprocess.run(["kdialog", "--getexistingdirectory", ...])
+3. tkinter filedialog               Separate GUI toolkit, own event loop
+```
+
+### Signals defined on SongPlayerWidget
+| Signal | Type | Direction | Purpose |
+|--------|------|-----------|---------|
+| `_pick_trigger` | `pyqtSignal()` | main → worker | Triggers `pick_folder()` on worker thread |
+| `_scan_trigger` | `pyqtSignal(str)` | main → worker | Triggers `scan_folder(path)` on worker thread |
+
+### Signals defined on _FolderWorker
+| Signal | Type | Direction | Purpose |
+|--------|------|-----------|---------|
+| `folder_picked` | `pyqtSignal(str)` | worker → main | Delivers chosen path ('' = cancelled) |
+| `songs_ready` | `pyqtSignal(list)` | worker → main | Delivers sorted list of audio file paths |
+| `error` | `pyqtSignal(str)` | worker → main | Delivers error message string |
 
 ---
 
@@ -232,7 +308,7 @@ Launch
   ├─→ First time? (no data.sql / base_dir missing)
   │     └─→ SetupWidget  →  enter name + pick sandbox folder  →  save to SQLite
   └─→ Returning user?
-        └─→ IntroScreen (60s splash, Re-setup btn top-right)
+        └─→ IntroDashboard (live splash: weather / profile / music player / system stats)
               └─→ click / timeout  →  Terminal page (tabs + PTY shell)
 ```
 
@@ -252,6 +328,8 @@ Table: `user_data`
 | success_cmds | INTEGER | Count of successful commands |
 | failed_cmds | INTEGER | Count of failed commands |
 | avatar | TEXT | Path to current avatar image |
+
+Encryption files (`data/database/data.sql.enc` + `data.sql.meta`) are created by the `bloom lock` command using AES via `pycryptodome`.
 
 ---
 
@@ -277,10 +355,11 @@ Table: `user_data`
 | `bloom terminal` | Spawns a new Bloom Terminal window |
 | `bloom tab` | Opens a new shell tab |
 | `bloom browser <url/text>` | Opens URL or Google-searches text in system browser |
-| `bloom -server` | Launches CineStream media server |
+| `bloom lock` | Launches Ghost Vault Pro encryption (AES via pycryptodome) |
+| `bloom -server` | Launches CineStream media server (Flask) |
 | `bloom -share` | Launches file-share app |
 | `bloom -usb` | Shows USB Cleaner / Porter selection dialog |
-| `bloom lockfile` | Launches Ghost Vault Pro (file encryption) |
+| `bloom lockfile` | Alias for Ghost Vault Pro |
 
 ---
 
@@ -305,6 +384,34 @@ Perk unlock levels: 1, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100
 - Password prompts (`password for` / `password:`) detected → hidden input mode (shows `*`).
 - ANSI escape sequences are stripped via regex before display.
 - Shell: detects `$SHELL`, falls back to `/bin/bash`, then `/bin/sh`.
+
+---
+
+## Intro Dashboard Widgets
+
+### IntroDashboard (`bloom/ui/widgets/intro_dashboard.py`)
+3-column live dashboard replacing the old static image splash:
+- **Left column**: Weather widget + Profile card (name, XP, level, colour orbs)
+- **Centre column**: Digital clock + Song player card (with Open Music Folder button)
+- **Right column**: Avatar + Hint ticker + Battery/CPU gauges + Running programs
+
+### WeatherWidget (`bloom/ui/widgets/weather_widget.py`)
+- Fetches from `wttr.in/?format=j1` (JSON, no API key needed)
+- Runs HTTP request in a `QThread` worker to avoid blocking UI
+- Displays: condition description, temperature °C, feels-like, weather icon emoji
+- Falls back gracefully if network unavailable
+
+### SystemStatsWidget (`bloom/ui/widgets/system_stats_widget.py`)
+- Uses `psutil` for live battery % and CPU %
+- Draws arc gauges via `QPainter` with gradient fills
+- Updates on a `QTimer` (interval: 2000ms)
+
+### SongPlayerWidget (`bloom/ui/widgets/song_player_widget.py`)
+- See "SongPlayerWidget — Threading Architecture" section above for full detail
+- Prev / Play-Pause / Next controls
+- Marquee label for long track names
+- Supports: `.mp3 .wav .ogg .flac .m4a .aac .opus .wma`
+- Falls back gracefully if `PyQt5.QtMultimedia` unavailable
 
 ---
 
@@ -346,55 +453,102 @@ Perk unlock levels: 1, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100
 ## Path Resolution (bloom/core/paths.py)
 
 ```python
-ROOT_DIR      = python-bloom/                      # repo root
-BLOOM_DIR     = python-bloom/bloom/                # package root
-ASSETS_DIR    = python-bloom/bloom/assets/
-LOGO_PATH     = bloom/assets/bloom-terminal-logo.png
-WATERMARK_PATH= bloom/assets/bloom-art-raw.png
-AVATARS_DIR   = bloom/assets/avatars/
-DATA_DIR      = python-bloom/data/
-DB_DIR        = python-bloom/data/database/
-DB_PATH       = python-bloom/data/database/data.sql
+ROOT_DIR       = python-bloom/
+BLOOM_DIR      = python-bloom/bloom/
+ASSETS_DIR     = python-bloom/bloom/assets/
+LOGO_PATH      = bloom/assets/bloom-terminal-logo.png
+WATERMARK_PATH = bloom/assets/bloom-art-raw.png
+AVATARS_DIR    = bloom/assets/avatars/
+DATA_DIR       = python-bloom/data/
+DB_DIR         = python-bloom/data/database/
+DB_PATH        = python-bloom/data/database/data.sql
 ```
 
 ---
 
-## Dependencies (requirements.txt)
+## Dependencies
 
+### Python packages (`requirements.txt`)
 ```
-PyQt5
-ptyprocess
-pycryptodome
-customtkinter
-flask
+PyQt5>=5.15.0
+pycryptodome>=3.10.0
+customtkinter>=5.0.0
+Flask>=2.0.0
+ptyprocess>=0.7.0
+psutil>=5.9.0
+requests>=2.28.0
 ```
+
+### System packages (auto-installed by `install.sh`)
+```
+python3-pyqt5
+python3-pyqt5.qtmultimedia
+libxcb-xinerama0 + other xcb libs
+gstreamer1.0-plugins-good (audio backend)
+zenity                    (native folder picker — critical for SongPlayerWidget)
+```
+
+> **Why zenity?** The Qt file dialog (`QFileDialog`) renders its own widget tree and on Wayland/X11 hybrid systems (GNOME with `QT_QPA_PLATFORM=xcb`) it can corrupt the parent widget layout causing a full freeze. `zenity` is a separate GTK process — it runs completely outside Qt.
+
+---
+
+## Known Issues / Open GitHub Issues
+
+| # | Title | Status | Notes |
+|---|-------|--------|-------|
+| 1 | 🐛 Broken Music Selector | Open | Filed on GitHub after initial push. Fixed by threading rewrite in session 2026-07-16 |
 
 ---
 
 ## Change Log
 
-| # | Date | Request | Result |
-|---|------|---------|--------|
-| 1 | — | Create GUI terminal like screenshots | PyQt5 app with intro splash + terminal view |
-| 2 | — | Show in dock, run it | `app.setApplicationName`, ran with `QT_QPA_PLATFORM=wayland` |
-| 3 | — | Fix white edges, click to skip intro | Set bg `#0f1219`, `mousePressEvent` on intro label |
-| 4 | — | Real terminal, tabs, first-time setup, save name to SQLite | SetupWidget, data.sql, tab widget with + button |
-| 5 | — | Refactor into separate files, tab close with confirmation | Split into bloom_db, bloom_setup, bloom_profile, bloom_terminal_tab, main.py |
-| 6 | — | Fix Enter typing literal `\n` | Fixed escaped string to real newline |
-| 7 | — | Smooth cropper, red dot close, double-click rename, watermark, hints | Custom AvatarCropper QPainter, BloomTabBar painted X, hint timer |
-| 8 | — | App icon in dock, watermark, smooth avatar editor | QIcon on app+window, WatermarkTerminal, full avatar editor |
-| 9 | — | All commands work, OS detection | Persistent shell (one bash per tab), OS detection, Ctrl+C, history arrows |
-| 10 | — | Sandbox jail, bloom profile working, real terminal errors | `_inside_jail()` check, cd intercepted, bloom built-ins intercepted, colours |
-| 11 | — | forai.md, force setup if no folder selected | Created forai.md, bloom_setup shows warning+blocks, main.py checks isdir |
-| 12 | — | Fix intro dividing line, + button clipping, tab bar border | IntroScreen uses pure paintEvent+resizeEvent, top_bar HBox layout, setTabBar+reparent, documentMode |
-| 13 | — | Redesign terminal to match screenshot + bloom_runner.sh | Pill-shaped custom-painted tabs, white circle + button, seamless BG_DARK tab row, bloom_runner.sh auto-venv launcher |
-| 14 | — | Remove welcome banner, fix prompt colors, protect output editing, style popups & bloom page commands | Prompt colors updated, output area made read-only, dark stylesheet for right-click, dialogs & rename menus, bloom setup/intro/terminal/tab commands, fixed QMessageBox navigation |
-| 15 | — | Fix add tab signal binding, integrate extra tools (server, share, usb, lockfile) | Wrapped `add_new_tab` in lambda to prevent bool pass-through crash; integrated extra-feature apps under bloom commands; added pycryptodome & customtkinter dependency checks in bloom_runner.sh |
-| 16 | — | Fix bloom -server crashing silently (No module named 'flask') | Installed Flask into venv; added `_launch_extra_tool()` helper showing crash errors inline |
-| 17 | — | Fix bloom commands going to bash, close tab broken, add bloom browser | Fixed bloom interception via token-split check; stored `_tab_widget_ref`; added `bloom browser <url/text>`; fixed help stats attributes |
-| 18 | — | Fix modifier keys shifting page view down | Updated keypress event filter to ignore standalone modifier key presses in read-only buffer area |
-| 19 | — | Rewrite shell backend to use ptyprocess | Replaced QProcess with `ptyprocess` real PTY; added password hiding; interactive `sudo` works |
-| 20 | 2026-07-16 | Restructure project to modular package | Full `bloom/` package layout; updated all imports; `run.py` entry point; `pyproject.toml`/`requirements.txt` |
-| 21 | 2026-07-16 | Final pre-push audit + forai.md update | Created `bloom/core/config.py` & `logger.py`; added all missing `__init__.py` (13 subpackages); verified 39 files compile + 10 modules import cleanly; updated forai.md; pushed to GitHub |
-| 22 | 2026-07-16 | Add wingit components + live intro dashboard | New widgets: `song_player_widget.py` (plays from folder/URL, seek bar, shuffle, prev/next), `system_stats_widget.py` (live battery % + CPU % arc gauges via psutil), `weather_widget.py` (wttr.in fetch, no API key), `intro_dashboard.py` (full live dashboard replacing static image splash — 3-column layout: weather, profile, colour orbs, song player / clock, avatar, hint ticker / battery+CPU, running programs). Added `psutil>=5.9.0` to requirements. |
-| 23 | 2026-07-16 | Fix startup crashes, real-time widgets, and QSocketNotifier warnings | Fixed `AttributeError` connection errors when locked. Restructured `intro_dashboard.py` layout to make the hours and minutes sizes match proportional styles, aligned the avatar, and embedded a visible "Open Music Folder" selector button. Built a real-time `RunningProgramsWidget` powered by `psutil` CPU sorting. Resolved `QSocketNotifier` thread warning via deferred loading, and removed the wttr.in typo re-introductions. |
+| # | Date | Request | What Changed | Files Affected |
+|---|------|---------|-------------|----------------|
+| 1 | — | Create GUI terminal like screenshots | PyQt5 app with intro splash + terminal view | `app.py` |
+| 2 | — | Show in dock, run it | `app.setApplicationName`, ran with `QT_QPA_PLATFORM=wayland` | `app.py` |
+| 3 | — | Fix white edges, click to skip intro | Set bg `#0f1219`, `mousePressEvent` on intro label | `app.py` |
+| 4 | — | Real terminal, tabs, first-time setup, save name to SQLite | SetupWidget, data.sql, tab widget with + button | `setup_widget.py`, `database.py` |
+| 5 | — | Refactor into separate files, tab close with confirmation | Split into bloom_db, bloom_setup, bloom_profile, bloom_terminal_tab, main.py | multiple |
+| 6 | — | Fix Enter typing literal `\n` | Fixed escaped string to real newline | `terminal.py` |
+| 7 | — | Smooth cropper, red dot close, double-click rename, watermark, hints | Custom AvatarCropper QPainter, BloomTabBar painted X, hint timer | `avatar_cropper.py`, `app.py` |
+| 8 | — | App icon in dock, watermark, smooth avatar editor | QIcon on app+window, WatermarkTerminal, full avatar editor | `app.py`, `avatar_cropper.py` |
+| 9 | — | All commands work, OS detection | Persistent shell (one bash per tab), OS detection, Ctrl+C, history arrows | `terminal.py` |
+| 10 | — | Sandbox jail, bloom profile working, real terminal errors | `_inside_jail()` check, cd intercepted, bloom built-ins intercepted, colours | `terminal.py` |
+| 11 | — | forai.md, force setup if no folder selected | Created forai.md, bloom_setup shows warning+blocks | `forai.md`, `setup_widget.py` |
+| 12 | — | Fix intro dividing line, + button clipping, tab bar border | IntroScreen pure paintEvent+resizeEvent, top_bar HBox layout | `app.py` |
+| 13 | — | Redesign terminal + bloom_runner.sh | Pill-shaped custom-painted tabs, bloom_runner.sh auto-venv launcher | `app.py`, `bloom_runner.sh` |
+| 14 | — | Remove welcome banner, fix prompt colors, style popups | Prompt colors, output read-only, dark stylesheet, bloom commands | `terminal.py`, `app.py` |
+| 15 | — | Fix add tab signal binding, integrate extra tools | lambda fix for bool crash; extra tools under bloom commands | `app.py`, `services/` |
+| 16 | — | Fix bloom -server silent crash (no flask) | Installed Flask; `_launch_extra_tool()` helper with inline errors | `app.py` |
+| 17 | — | Fix bloom commands going to bash, bloom browser | Token-split interception; `_tab_widget_ref`; `bloom browser` command | `terminal.py` |
+| 18 | — | Fix modifier keys shifting page view | Updated keypress filter to ignore standalone modifier keys | `terminal.py` |
+| 19 | — | Rewrite shell backend to use ptyprocess | Replaced QProcess with `ptyprocess` real PTY; password hiding; interactive sudo | `terminal.py` |
+| 20 | 2026-07-16 | Restructure project to modular package | Full `bloom/` package layout; updated all imports; `run.py`; `pyproject.toml` | whole project |
+| 21 | 2026-07-16 | Final pre-push audit + forai.md update | `bloom/core/config.py` & `logger.py`; all `__init__.py`; verified 39 files | `forai.md`, `core/` |
+| 22 | 2026-07-16 | Add wingit components + live intro dashboard | `song_player_widget.py`, `system_stats_widget.py`, `weather_widget.py`, `intro_dashboard.py` | `ui/widgets/` |
+| 23 | 2026-07-16 | Fix startup crashes, real-time widgets, QSocketNotifier warnings | Fixed `AttributeError` connections; restructured dashboard layout; `RunningProgramsWidget` via psutil | `intro_dashboard.py`, `system_stats_widget.py` |
+| 24 | 2026-07-16 | **Git push** — UI, bloom lock, encryption, weather/analytics from intro | Committed avatar + encrypted DB files; pushed 2 commits to GitHub; filed GitHub issue: "Broken Music Selector" | `data/database/`, `assets/avatars/`, GitHub |
+| 25 | 2026-07-16 | **Fix: music folder dialog crashes app** (attempt 1) | Replaced `QFileDialog(DontUseNativeDialog)` with `QFileDialog.getExistingDirectory()` — still used Qt widget renderer, still crashed on Wayland/X11 hybrid | `song_player_widget.py` |
+| 26 | 2026-07-16 | **Fix: music folder dialog crashes app** (attempt 2 — partial) | Replaced Qt dialog with `subprocess.run(zenity)` — fixed crash but blocked main thread → app froze while zenity was open | `song_player_widget.py` |
+| 27 | 2026-07-16 | **Fix: music folder picker freezes app** (attempt 3 — broken) | Tried `QMetaObject.invokeMethod(worker, "pick_folder", QueuedConnection)` → **RuntimeError: No such method** because `@pyqtSlot` was missing | `song_player_widget.py` |
+| 28 | 2026-07-16 | **Fix: music folder picker** — final correct solution | Full `QThread` + `@pyqtSlot` rewrite. Two signals: `_pick_trigger → worker.pick_folder()` and `_scan_trigger → worker.scan_folder(path)`. `QMetaObject.invokeMethod` removed entirely. OS.walk also moved to worker thread. Button shows `…` + disabled while picker is open. Smooth, non-blocking, correct. | `song_player_widget.py` |
+| 29 | 2026-07-16 | **Add `install.sh`** — one-command installer for fresh clone | `install.sh` checks Python version, installs Qt system libs + zenity via apt, creates venv, installs all pip packages, generates `bloom.sh` launcher with `QT_QPA_PLATFORM=xcb` | `install.sh`, `bloom.sh` |
+
+---
+
+## Debugging Tips
+
+### "QSocketNotifier: Can only be used with threads started with QThread"
+This means a `QSocketNotifier` (used by the PTY backend) is being created from a non-Qt thread. The PTY notifier must be created on the main thread. Ensure `TerminalTab.__init__` and `_setup_pty()` are called from the main thread only.
+
+### "QMetaObject::invokeMethod: No such method _FolderWorker::pick_folder()"
+`QMetaObject.invokeMethod` cannot find the method — the slot is missing its `@pyqtSlot()` decorator OR `invokeMethod` is being used (it's been removed). Use signal→slot connections with `Qt.QueuedConnection` instead.
+
+### "Warning: Ignoring XDG_SESSION_TYPE=wayland on Gnome"
+Not an error — just a warning. Set `QT_QPA_PLATFORM=xcb` before launching to suppress it. `install.sh` + `bloom.sh` do this automatically.
+
+### App freezes when opening folder picker
+`subprocess.run()` was called on the main thread. All blocking calls must be on `_FolderWorker` (the QThread worker). See "SongPlayerWidget — Threading Architecture" above.
+
+### VS Code lags when running Bloom
+VS Code's Python debugger attaches to all threads including Qt's render thread. Run with `--no-debug` or use `bloom.sh` from an external terminal for smooth performance.
