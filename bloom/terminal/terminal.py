@@ -166,8 +166,8 @@ class TerminalTab(QWidget):
             self._insert_error(f"[Bloom] Could not start shell: {e}\n")
             return
 
-        self.notifier = QSocketNotifier(self.pty.fd, QSocketNotifier.Read, self)
-        self.notifier.activated.connect(self._on_pty_read)
+        self.notifier = None  # created after event loop starts
+        QTimer.singleShot(0, self._setup_notifier)
 
         if IS_WINDOWS:
             self.pty.write("@echo off\r\nprompt $\r\n")
@@ -175,6 +175,13 @@ class TerminalTab(QWidget):
         self._write_prompt()
         self.text_area.installEventFilter(self)
         self._schedule_hint()
+
+    def _setup_notifier(self):
+        """Create QSocketNotifier after the Qt event loop is running to avoid thread warning."""
+        if not hasattr(self, 'pty'):
+            return
+        self.notifier = QSocketNotifier(self.pty.fd, QSocketNotifier.Read, self)
+        self.notifier.activated.connect(self._on_pty_read)
 
     def _inside_jail(self, path: str) -> bool:
         real = os.path.realpath(path)
@@ -210,11 +217,13 @@ class TerminalTab(QWidget):
         try:
             raw = self.pty.read(4096)
             if not raw:
-                self.notifier.setEnabled(False)
+                if self.notifier:
+                    self.notifier.setEnabled(False)
                 self._on_shell_exit(0, 0)
                 return
         except EOFError:
-            self.notifier.setEnabled(False)
+            if self.notifier:
+                self.notifier.setEnabled(False)
             self._on_shell_exit(0, 0)
             return
         except BlockingIOError:
@@ -222,10 +231,17 @@ class TerminalTab(QWidget):
 
         text = _strip_ansi(raw)
         self._stdout_buf += text
+        
+        # Split using standard splitlines
         lines = self._stdout_buf.splitlines(keepends=True)
-
-        if lines and not lines[-1].endswith("\n"):
-            self._stdout_buf = lines.pop()
+        
+        # If the last line doesn't end with a newline but contains __BLOOM_DONE__,
+        # we process the whole buffer now instead of waiting.
+        if lines and not lines[-1].endswith("\n") and not lines[-1].endswith("\r"):
+            if "__BLOOM_DONE__" in lines[-1]:
+                self._stdout_buf = ""
+            else:
+                self._stdout_buf = lines.pop()
         else:
             self._stdout_buf = ""
 
@@ -261,6 +277,12 @@ class TerminalTab(QWidget):
                         self.current_dir = self.jail_root
 
         self.app_ref.add_xp(success)
+        
+        # Show a hint when a command is executed
+        hint = random.choice(HINTS)
+        clean_hint = hint.replace("💡 ", "")
+        self._insert_html(f"<br/><span style='color:#8a9bb8;'>💡 Hint: {clean_hint}</span><br/>")
+        
         QTimer.singleShot(60, self._write_prompt)
 
     def _on_shell_exit(self, code, _status):
@@ -275,6 +297,10 @@ class TerminalTab(QWidget):
         if cmd == "bloom profile":
             self.app_ref.show_profile()
             self._write_prompt()
+            return True
+
+        if cmd == "bloom lock":
+            self.app_ref.lock_app()
             return True
 
         if cmd == "bloom intro":
@@ -559,6 +585,14 @@ class TerminalTab(QWidget):
         self.text_area.setTextCursor(cursor)
         self.text_area.ensureCursorVisible()
 
+    def _insert_html(self, html: str):
+        cursor = self.text_area.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertHtml(html)
+        cursor.setCharFormat(_FMT_DEFAULT)
+        self.text_area.setTextCursor(cursor)
+        self.text_area.ensureCursorVisible()
+
     def _insert_error(self, text: str):
         self._insert_colored(text, QColor("#ff6b6b"))
 
@@ -575,7 +609,7 @@ class TerminalTab(QWidget):
     def _show_hint(self):
         if not self.is_running:
             hint = random.choice(HINTS)
-            self._insert_colored(f"\n{hint}\n", QColor("#4a5568"))
+            self._insert_html(f"<br/><span style='color:#4a5568;'>{hint}</span><br/>")
             self._write_prompt()
         self._schedule_hint()
 
@@ -698,11 +732,12 @@ class TerminalTab(QWidget):
 
         if key == Qt.Key_Up:
             if self._history:
-                self._hist_idx = (
-                    len(self._history) - 1
-                    if self._hist_idx == -1
-                    else max(0, self._hist_idx - 1)
-                )
+                if self._hist_idx == -1:
+                    # Start at the latest command
+                    self._hist_idx = len(self._history) - 1
+                else:
+                    # Move to older command but stop at the first command (index 0)
+                    self._hist_idx = max(0, self._hist_idx - 1)
                 self._replace_input(self._history[self._hist_idx])
             return True
 

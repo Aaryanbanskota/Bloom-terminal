@@ -25,6 +25,8 @@ def init_db():
     return conn
 
 def get_user_data(conn):
+    if conn is None:
+        return None
     cursor = conn.cursor()
     cursor.execute('SELECT name, base_dir, xp, level, success_cmds, failed_cmds, avatar FROM user_data LIMIT 1')
     return cursor.fetchone()
@@ -36,6 +38,8 @@ def save_user_setup(conn, name, base_dir):
     conn.commit()
 
 def update_user_stats(conn, xp, level, success, failed, avatar):
+    if conn is None:
+        return
     cursor = conn.cursor()
     cursor.execute('''UPDATE user_data SET 
         xp = ?, level = ?, success_cmds = ?, failed_cmds = ?, avatar = ?

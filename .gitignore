@@ -28,3 +28,6 @@ Thumbs.db
 
 # Misc
 *.log
+
+# API Keys & Secrets (NEVER commit these)
+bloom/api/config.py

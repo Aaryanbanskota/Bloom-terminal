@@ -50,25 +50,28 @@ info "Virtual environment activated."
 # ── Install dependencies if not present ────────────────────────
 DEPS_NEEDED=0
 "$PYTHON" -c "import PyQt5" &>/dev/null || DEPS_NEEDED=1
-"$PYTHON" -c "import PyQt6" &>/dev/null || DEPS_NEEDED=1
 "$PYTHON" -c "import Crypto" &>/dev/null || DEPS_NEEDED=1
-"$PYTHON" -c "import customtkinter" &>/dev/null || DEPS_NEEDED=1
-"$PYTHON" -c "import flask" &>/dev/null || DEPS_NEEDED=1
+"$PYTHON" -c "import ptyprocess" &>/dev/null || DEPS_NEEDED=1
+"$PYTHON" -c "import psutil" &>/dev/null || DEPS_NEEDED=1
 
 if [ $DEPS_NEEDED -eq 1 ]; then
-    info "Installing dependencies (PyQt5, PyQt6, pycryptodome, customtkinter, Flask) — this may take a moment..."
+    info "Installing dependencies (PyQt5, pycryptodome, ptyprocess, psutil) — this may take a moment..."
     pip install --quiet --upgrade pip
-    pip install --quiet PyQt5 PyQt6 pycryptodome customtkinter Flask
+    pip install --quiet PyQt5 pycryptodome ptyprocess psutil
     ok "Dependencies installed."
 else
     info "Dependencies are already up to date."
 fi
 
 # ── Detect display server ────────────────────────────────────────
-# Prefer Wayland when available; fall back to xcb (X11)
-if [ -n "$WAYLAND_DISPLAY" ] || [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+# GNOME Wayland sessions set WAYLAND_DISPLAY even when XDG_SESSION_TYPE
+# is overridden. We use WAYLAND_DISPLAY as the primary signal.
+if [ -n "$WAYLAND_DISPLAY" ]; then
     QT_PLATFORM="wayland"
+elif [ "$XDG_SESSION_TYPE" = "x11" ] || [ -n "$DISPLAY" ]; then
+    QT_PLATFORM="xcb"
 else
+    # last-resort fallback
     QT_PLATFORM="xcb"
 fi
 info "Display backend: $QT_PLATFORM"
@@ -77,4 +80,6 @@ info "Display backend: $QT_PLATFORM"
 ok "Starting Bloom Terminal 🌸"
 cd "$SCRIPT_DIR"
 export QT_QPA_PLATFORM="$QT_PLATFORM"
+# Silence the benign QSocketNotifier/Wayland thread warning from ptyprocess
+export QT_LOGGING_RULES="qt.qpa.wayland.warning=false"
 exec "$PYTHON" run.py "$@"

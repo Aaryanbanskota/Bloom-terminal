@@ -5,18 +5,28 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                              QTabBar, QInputDialog, QLineEdit, QSizePolicy,
                              QMessageBox)
 from PyQt5.QtGui import QPixmap, QIcon, QPainter, QColor, QBrush, QPen, QFont
-from PyQt5.QtCore import Qt, QTimer, QSize, QRect, QPoint, QRectF
+from PyQt5.QtCore import Qt, QTimer, QSize, QRect, QPoint, QRectF, QSettings
 
 from bloom.core.constants import BG_DARK, TAB_ACTIVE, TAB_IDLE, TAB_BORDER, DOT_RED, TAB_TEXT, TAB_TEXT_SEL
 from bloom.core.paths import LOGO_PATH
 from bloom.storage.database import init_db, get_user_data, update_user_stats
 from bloom.ui.widgets.setup_widget import SetupWidget
+from bloom.ui.widgets.intro_dashboard import IntroDashboard
 from bloom.ui.dialogs.profile_dialog import ProfileDialog
 from bloom.terminal.terminal import TerminalTab
 
-# Image used for intro splash. We can check screenshots in root or docs.
-INTRO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "docs", "screenshots", "Screenshot from 2026-07-07 13-31-54.png")
+# Optional: settings dialog and security (graceful if not yet created)
+try:
+    from bloom.ui.dialogs.settings_dialog import SettingsDialog
+    _HAS_SETTINGS = True
+except ImportError:
+    _HAS_SETTINGS = False
+
+try:
+    from bloom.security.encryption import SecurityManager, PasswordLockScreen
+    _HAS_SECURITY = True
+except ImportError:
+    _HAS_SECURITY = False
 
 class BloomTabBar(QTabBar):
     TAB_H      = 24
@@ -174,76 +184,80 @@ def _font_available(name: str) -> bool:
     return name in QFontDatabase().families()
 
 
-class IntroScreen(QWidget):
-    def __init__(self, on_click, on_resetup, parent=None):
-        super().__init__(parent)
-        self._on_click = on_click
-        self._pixmap   = QPixmap(INTRO_PATH) if os.path.exists(INTRO_PATH) else QPixmap()
-        self.setAttribute(Qt.WA_StyledBackground, False)
-
-        self._btn = QPushButton("⚙  Re-setup", self)
-        self._btn.setCursor(Qt.PointingHandCursor)
-        self._btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(10, 13, 20, 0.65);
-                color: #a0aec0;
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 6px;
-                padding: 5px 14px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background: rgba(59,142,234,0.5);
-                color: white;
-            }
-        """)
-        self._btn.adjustSize()
-        self._btn.clicked.connect(on_resetup)
-        self._btn.raise_()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        margin = 12
-        bw = self._btn.sizeHint().width()
-        bh = self._btn.sizeHint().height()
-        self._btn.setGeometry(self.width() - bw - margin, margin, bw, bh)
-
-    def mousePressEvent(self, event):
-        if not self._btn.geometry().contains(event.pos()):
-            self._on_click(event)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor(BG_DARK))
-        if not self._pixmap.isNull():
-            painter.setRenderHint(QPainter.SmoothPixmapTransform)
-            scaled = self._pixmap.scaled(
-                self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
-            )
-            x = (self.width()  - scaled.width())  // 2
-            y = (self.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
-        painter.end()
+# IntroScreen replaced by IntroDashboard (see bloom/ui/widgets/intro_dashboard.py)
 
 
 class BloomTerminalApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.db_conn = init_db()
+        # If database is locked, we will initialize the connection after unlocking
+        from bloom.security.encryption import SecurityManager
+        self.sec = SecurityManager()
+        if self.sec.is_locked():
+            self.db_conn = None
+        else:
+            self.db_conn = init_db()
         self.load_user_data()
         self._init_ui()
 
+    def cache_user_data(self):
+        settings = QSettings("Bloom", "BloomTerminal")
+        settings.setValue("cached_user_name", self.user_name)
+        settings.setValue("cached_base_dir", self.base_dir)
+        settings.setValue("cached_xp", self.xp)
+        settings.setValue("cached_level", self.level)
+        settings.setValue("cached_succ", self.succ)
+        settings.setValue("cached_fail", self.fail)
+        settings.setValue("cached_avatar", self.avatar)
+
+    def load_cached_user_data(self):
+        settings = QSettings("Bloom", "BloomTerminal")
+        self.user_name = settings.value("cached_user_name", "User")
+        self.base_dir = settings.value("cached_base_dir", "")
+        self.xp = settings.value("cached_xp", 0, type=int)
+        self.level = settings.value("cached_level", 1, type=int)
+        self.succ = settings.value("cached_succ", 0, type=int)
+        self.fail = settings.value("cached_fail", 0, type=int)
+        self.avatar = settings.value("cached_avatar", "")
+
     def load_user_data(self):
-        data = get_user_data(self.db_conn)
-        if data and data[0] and data[1] and os.path.isdir(data[1]):
-            self.user_name, self.base_dir, self.xp, self.level, \
-                self.succ, self.fail, self.avatar = data
+        if self.sec.is_locked() and self.db_conn is None:
+            self.load_cached_user_data()
             self.has_setup = True
-        else:
-            self.user_name = self.base_dir = self.avatar = ""
-            self.xp = self.succ = self.fail = 0
-            self.level = 1
-            self.has_setup = False
+            return
+
+        try:
+            data = get_user_data(self.db_conn)
+            if data and data[0] and data[1] and os.path.isdir(data[1]):
+                self.user_name, self.base_dir, self.xp, self.level, \
+                    self.succ, self.fail, self.avatar = data
+                self.has_setup = True
+                self.cache_user_data()
+            else:
+                self.user_name = self.base_dir = self.avatar = ""
+                self.xp = self.succ = self.fail = 0
+                self.level = 1
+                self.has_setup = False
+        except Exception:
+            self.load_cached_user_data()
+            self.has_setup = True
+
+    def on_database_unlocked(self):
+        self.db_conn = init_db()
+        self.load_user_data()
+        self._intro.refresh_user(
+            self.user_name,
+            self.xp,
+            self.level,
+            self.avatar
+        )
+        # Update jail root for the terminal tabs
+        for i in range(self.tab_widget.count()):
+            tab = self.tab_widget.widget(i)
+            if hasattr(tab, "jail_root"):
+                tab.jail_root = os.path.realpath(self.base_dir)
+                tab.current_dir = tab.jail_root
+                tab.username = self.user_name
 
     def _init_ui(self):
         self.setWindowTitle("Bloom Terminal")
@@ -263,14 +277,23 @@ class BloomTerminalApp(QWidget):
         self.setup_widget = SetupWidget(self)
         self.stack.addWidget(self.setup_widget)
 
-        self._intro = IntroScreen(self.skip_intro, self.go_to_setup)
+        self._intro = IntroDashboard(
+            user_name   = self.user_name,
+            xp          = self.xp,
+            level       = self.level,
+            avatar_path = self.avatar,
+            on_click    = self.skip_intro,
+            on_resetup  = self.go_to_setup,
+            on_settings = self._open_settings,
+            parent_app  = self,
+        )
         self.stack.addWidget(self._intro)
 
         self.stack.addWidget(self._build_terminal())
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self.show_terminal)
+        self._timer.timeout.connect(self.skip_intro)
 
         if self.has_setup:
             self.show_intro()
@@ -372,19 +395,42 @@ class BloomTerminalApp(QWidget):
             if self.tab_widget.count() == 0:
                 self.add_new_tab()
 
+    def lock_app(self):
+        # Secure the DB connection and lock state
+        if self.db_conn:
+            self.db_conn.close()
+            self.db_conn = None
+        self.sec.settings.setValue("lock_enabled", True)
+        self._intro.is_locked = True
+        self._intro.pass_edit.setVisible(True)
+        self._intro.pass_edit.clear()
+        self._intro.pass_edit.setFocus()
+        self._intro.pulsing_lbl.setVisible(False)
+        self.show_intro()
+
     def go_to_setup(self):
         self._timer.stop()
         self.stack.setCurrentIndex(0)
 
     def show_intro(self):
+        self._intro.refresh_user(
+            self.user_name,
+            self.xp,
+            self.level,
+            self.avatar,
+        )
         self.stack.setCurrentIndex(1)
         self._timer.start(60_000)
 
     def skip_intro(self, _event=None):
+        if self._intro.is_locked:
+            return  # block entering if locked
         self._timer.stop()
         self.show_terminal()
 
     def show_terminal(self):
+        if self._intro.is_locked:
+            return
         if not self.base_dir or not os.path.isdir(self.base_dir):
             self.go_to_setup()
             return
@@ -400,8 +446,22 @@ class BloomTerminalApp(QWidget):
             self.fail += 1
             self.xp   += 5
         self.level = int((self.xp / 100) ** 0.6) + 1
-        update_user_stats(self.db_conn, self.xp, self.level,
-                          self.succ, self.fail, self.avatar)
+        if self.db_conn is not None:
+            update_user_stats(self.db_conn, self.xp, self.level,
+                              self.succ, self.fail, self.avatar)
+        # Always keep the QSettings cache up to date
+        self.cache_user_data()
+
+    def _open_settings(self):
+        """Open the settings dialog (gear button callback)."""
+        if _HAS_SETTINGS:
+            dlg = SettingsDialog(self)
+            dlg.exec_()
+        else:
+            QMessageBox.information(
+                self, "Settings",
+                "Settings dialog is loading.\nRun the app once to generate all files."
+            )
 
     def show_profile(self):
         self.load_user_data()
@@ -458,11 +518,14 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Bloom Terminal")
     app.setApplicationDisplayName("Bloom Terminal")
+    app.setOrganizationName("Bloom")
     if os.path.exists(LOGO_PATH):
         app.setWindowIcon(QIcon(LOGO_PATH))
 
+    # The password lock screen is integrated directly inside the IntroDashboard now,
+    # so we load the main application immediately!
     ex = BloomTerminalApp()
-    ex.resize(960, 600)
+    ex.resize(1100, 680)
     ex.show()
     sys.exit(app.exec_())
 
