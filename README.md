@@ -107,19 +107,27 @@ sequenceDiagram
 
 ## 🚀 Quick Start
 
-### 🌸 Recommended — One-Command Installer
+### 🌸 One-Command Installation
 
-To install Bloom Terminal, automatically download the latest release, register the `bloom` command, and create a desktop application launcher, run:
+Install the latest version of Bloom Terminal with a single command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
 ```
 
-or using `wget`:
+Or, using wget:
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
 ```
+
+After installation, launch Bloom from your terminal:
+
+```bash
+bloom
+```
+
+Or search **Bloom Terminal** from your desktop's application launcher.
 
 ### 🔧 Manual Setup (Developers)
 
