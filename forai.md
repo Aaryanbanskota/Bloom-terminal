@@ -536,6 +536,9 @@ zenity                    (native folder picker — critical for SongPlayerWidge
 | 29 | 2026-07-16 | **Add `install.sh`** — one-command installer for fresh clone | `install.sh` checks Python version, installs Qt system libs + zenity via apt, creates venv, installs all pip packages, generates `bloom.sh` launcher with `QT_QPA_PLATFORM=xcb` | `install.sh`, `bloom.sh` |
 | 30 | 2026-07-16 | **Bump version & universal installer updates** | Bumped version to `v0.1.0-beta` in configs, pyproject, and README. Overhauled `install.sh` to auto-detect and support `apt`, `dnf`, `pacman`, `zypper`. Registered `bloom` symlink/binary and a desktop launcher menu item (`bloom-terminal.desktop`). | `pyproject.toml`, `README.md`, `install.sh`, `bloom/core/config.py` |
 | 31 | 2026-07-16 | **Add `bloom doctor` command** | Created system check diagnostics command `bloom doctor` to print OS, python, Qt status, audio player plugins, database setup validity, dependencies, folder permissions, and active picker tools. | `bloom/terminal/terminal.py`, `forai.md` |
+| 32 | 2026-07-16 | **Refactor Installer into Bootstrap and Core** | Split the single repository installer into a lightweight bootstrapping `install.sh` and a core installer `scripts/setup.sh` inside the code folder. | `install.sh`, `scripts/setup.sh` |
+| 33 | 2026-07-16 | **Add Release Downloader & Git Clone Fallback** | Updated `install.sh` to download/extract release archives automatically and fall back to `git clone` if downloading fails (due to testing on private repos). | `install.sh` |
+| 34 | 2026-07-16 | **Update Documentation & Release Tags** | Updated `README.md` and `forai.md` to document the new installer. Created and updated the `v0.1.0-beta` git release tag. | `README.md`, `forai.md`, Git |
 
 ---
 
