@@ -493,6 +493,33 @@ zenity                    (native folder picker — critical for SongPlayerWidge
 
 ---
 
+## Bootstrap & Core Installer Architecture
+
+The installation process is split into two components to facilitate a seamless, single-command installation experience for end-users:
+
+### 1. The Bootstrapper (`install.sh` at the root)
+- **Role**: This is the script downloaded and run by the user via the `curl` or `wget` command.
+- **Workflow**:
+  1. **OS Detection**: Detects the Linux distribution name to present a tailored console output.
+  2. **Bootstrap Dependencies**: Verifies if basic command line utilities like `curl` and `tar` are installed, and automatically installs them if missing.
+  3. **Release Querying**: Contacts the GitHub Releases API (`api.github.com/repos/Aaryanbanskota/Bloom-terminal/releases/latest`) to resolve the newest tag name and tarball download URL.
+  4. **Fallback Handler**: If the repository is private or the GitHub API rate limit is exceeded, it falls back to copying/cloning the repository using Git SSH (`git@github.com:Aaryanbanskota/Bloom-terminal.git`).
+  5. **Extraction**: Downloads and extracts the release directly into the user's home directory under `~/.bloom-terminal`, stripping any archive parent directories.
+  6. **Handover**: Executes `scripts/setup.sh` inside `~/.bloom-terminal`.
+
+### 2. The Core Setup (`scripts/setup.sh` in the codebase)
+- **Role**: Runs inside the target installation directory to configure system packages, virtual environments, command registration, and desktop icons.
+- **Workflow**:
+  1. **Package Manager Selection**: Identifies if the system uses `apt`, `dnf`, `pacman`, or `zypper`.
+  2. **System Dependencies**: Installs the required Qt5 and GStreamer system libraries (like `python3-pyqt5`, `zenity`, XCB libraries, etc.).
+  3. **Virtualenv Setup**: Creates a Python virtual environment at `~/.bloom-terminal/venv` to ensure isolated executions.
+  4. **PIP Requirements**: Installs and upgrades Python libraries (`PyQt5`, `customtkinter`, `psutil`, `pycryptodome`, etc.).
+  5. **Executable Script**: Generates a launcher script (`~/.bloom-terminal/bloom.sh`) exporting critical configurations (e.g. `QT_QPA_PLATFORM=xcb` and `PYTHONPATH`).
+  6. **Global Terminal Command**: Symlinks `bloom.sh` to `/usr/local/bin/bloom` (or falling back to `~/.local/bin/bloom` if write permissions are denied).
+  7. **Desktop Application Shortcut**: Generates a `.desktop` launcher file in `~/.local/share/applications/bloom-terminal.desktop` linking the correct launcher script and logo file.
+
+---
+
 ## Known Issues / Open GitHub Issues
 
 | # | Title | Status | Notes |

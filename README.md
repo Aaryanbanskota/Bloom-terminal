@@ -7,13 +7,13 @@
     <img src="https://img.shields.io/badge/version-v0.1.0--beta-ff6eb4?style=for-the-badge" alt="Version"/>
   </a>
   <a href="https://github.com/Aaryanbanskota/Bloom-terminal/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Aaryanbanskota/Bloom-terminal?color=c084fc&style=for-the-badge" alt="License"/>
+    <img src="https://img.shields.io/badge/License-MIT-c084fc?style=for-the-badge" alt="License"/>
   </a>
   <a href="https://www.python.org/downloads/">
     <img src="https://img.shields.io/badge/Python-3.8%2B-ff6eb4?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.8+"/>
   </a>
   <a href="https://github.com/Aaryanbanskota/Bloom-terminal/stargazers">
-    <img src="https://img.shields.io/github/stars/Aaryanbanskota/Bloom-terminal?color=c084fc&style=for-the-badge&logo=github" alt="Stars"/>
+    <img src="https://img.shields.io/badge/Stars-active-c084fc?style=for-the-badge&logo=github" alt="Stars"/>
   </a>
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-ff6eb4?style=for-the-badge" alt="Platform"/>
 </p>
