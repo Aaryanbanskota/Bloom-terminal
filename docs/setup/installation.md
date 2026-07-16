@@ -1,21 +1,41 @@
 # Installation Guide
 
 ## Requirements
-- Python 3.10+
+- Python 3.8+
 - PyQt5
 - psutil
 - pycryptodome
+- curl / wget (for bootstrap installation)
+- tar (for archive extraction)
 
-## Easy Start
-Run the shell launcher:
+## Recommended: One-Command Bootstrap Installation
+This is the easiest way to install Bloom Terminal. It will automatically download the latest release, extract it, install dependencies, register the global command, and create the desktop launcher.
+
 ```bash
-./bloom_runner.sh
+curl -fsSL https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
 ```
 
-## Manual Installation
+Or using `wget`:
+
 ```bash
-python -m venv venv
+wget -qO- https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
+```
+
+## Manual Setup (Developers)
+If you prefer to clone the repository and run Bloom Terminal manually:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Aaryanbanskota/Bloom-terminal.git
+cd Bloom-terminal
+
+# 2. Setup virtual environment
+python3 -m venv venv
 source venv/bin/activate
+
+# 3. Install requirements
 pip install -r requirements.txt
+
+# 4. Run the app
 python run.py
 ```
