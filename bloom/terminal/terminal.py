@@ -34,14 +34,130 @@ def _detect_shell():
 
 SHELL_EXE, SHELL_ARGS = _detect_shell()
 
-_ANSI_RE = re.compile(
-    r'\x1b\[[0-9;?]*[a-zA-Z]'
-    r'|\x1b[()][AB012]'
-    r'|\r'
+# ── ANSI colour / attribute tables ──────────────────────────────────────────
+# Foreground: SGR 30-37 (standard), 90-97 (bright)
+_FG_COLORS = {
+    30: "#1a1a1a",  31: "#ff5555",  32: "#50fa7b",  33: "#f1fa8c",
+    34: "#6272a4",  35: "#ff79c6",  36: "#8be9fd",  37: "#f8f8f2",
+    90: "#555555",  91: "#ff6e6e",  92: "#69ff94",  93: "#ffffa5",
+    94: "#d6acff",  95: "#ff92df",  96: "#a4ffff",  97: "#ffffff",
+}
+# Background: SGR 40-47 (standard), 100-107 (bright)
+_BG_COLORS = {
+    40: "#1a1a1a",  41: "#ff5555",  42: "#50fa7b",  43: "#f1fa8c",
+    44: "#6272a4",  45: "#ff79c6",  46: "#8be9fd",  47: "#f8f8f2",
+    100: "#555555", 101: "#ff6e6e", 102: "#69ff94", 103: "#ffffa5",
+    104: "#d6acff", 105: "#ff92df", 106: "#a4ffff", 107: "#ffffff",
+}
+_DEFAULT_FG = "#e2e8f0"
+_DEFAULT_BG = None
+
+# Regex that splits text into ANSI CSI sequences vs plain text chunks
+_ANSI_SPLIT_RE = re.compile(
+    r'(\x1b\[[0-9;?]*[A-Za-z]'    # CSI sequences  ESC [ ... <letter>
+    r'|\x1b[()][AB012]'           # charset sequences
+    r'|\r)'                       # bare carriage returns
 )
 
-def _strip_ansi(text: str) -> str:
-    return _ANSI_RE.sub("", text)
+# Sequences that are NOT colour/attr (cursor movement, erase, etc.) — ignore text effect
+_CSI_TEXT_MOVERS = re.compile(r'\x1b\[[0-9;?]*[ABCDEFGHJKST]')
+
+class _AnsiState:
+    """Carries current SGR state across PTY read() calls."""
+    __slots__ = ("fg", "bg", "bold", "italic", "underline", "reverse")
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.fg        = _DEFAULT_FG
+        self.bg        = _DEFAULT_BG
+        self.bold      = False
+        self.italic    = False
+        self.underline = False
+        self.reverse   = False
+    def apply_sgr(self, params: list):
+        """Apply a list of SGR parameter ints to the current state."""
+        i = 0
+        while i < len(params):
+            p = params[i]
+            if p == 0:
+                self.reset()
+            elif p == 1:
+                self.bold = True
+            elif p == 2:
+                self.bold = False          # faint → treat as normal
+            elif p == 3:
+                self.italic = True
+            elif p == 4:
+                self.underline = True
+            elif p == 7:
+                self.reverse = True
+            elif p == 22:
+                self.bold = False
+            elif p == 23:
+                self.italic = False
+            elif p == 24:
+                self.underline = False
+            elif p == 27:
+                self.reverse = False
+            elif p == 39:
+                self.fg = _DEFAULT_FG
+            elif p == 49:
+                self.bg = _DEFAULT_BG
+            elif p in _FG_COLORS:
+                self.fg = _FG_COLORS[p]
+            elif p in _BG_COLORS:
+                self.bg = _BG_COLORS[p]
+            elif p == 38 and i + 1 < len(params) and params[i + 1] == 5:
+                # 256-colour fg: ESC[38;5;Nm
+                if i + 2 < len(params):
+                    self.fg = _256_color(params[i + 2])
+                    i += 2
+            elif p == 48 and i + 1 < len(params) and params[i + 1] == 5:
+                # 256-colour bg: ESC[48;5;Nm
+                if i + 2 < len(params):
+                    self.bg = _256_color(params[i + 2])
+                    i += 2
+            elif p == 38 and i + 1 < len(params) and params[i + 1] == 2:
+                # true-colour fg: ESC[38;2;R;G;Bm
+                if i + 4 < len(params):
+                    r, g, b = params[i+2], params[i+3], params[i+4]
+                    self.fg = f"#{r:02x}{g:02x}{b:02x}"
+                    i += 4
+            elif p == 48 and i + 1 < len(params) and params[i + 1] == 2:
+                # true-colour bg: ESC[48;2;R;G;Bm
+                if i + 4 < len(params):
+                    r, g, b = params[i+2], params[i+3], params[i+4]
+                    self.bg = f"#{r:02x}{g:02x}{b:02x}"
+                    i += 4
+            i += 1
+    def to_fmt(self) -> "QTextCharFormat":
+        fmt = QTextCharFormat()
+        fg = self.bg if self.reverse else self.fg
+        bg = self.fg if self.reverse else self.bg
+        fmt.setForeground(QColor(fg or _DEFAULT_FG))
+        if bg:
+            fmt.setBackground(QColor(bg))
+        fmt.setFontWeight(700 if self.bold else 400)
+        fmt.setFontItalic(self.italic)
+        fmt.setFontUnderline(self.underline)
+        return fmt
+
+def _256_color(n: int) -> str:
+    """Convert xterm-256 colour index → #rrggbb."""
+    if n < 16:
+        palette = [
+            "#000000","#800000","#008000","#808000",
+            "#000080","#800080","#008080","#c0c0c0",
+            "#808080","#ff0000","#00ff00","#ffff00",
+            "#0000ff","#ff00ff","#00ffff","#ffffff",
+        ]
+        return palette[n]
+    if n < 232:
+        n -= 16
+        b = n % 6; g = (n // 6) % 6; r = n // 36
+        return "#{:02x}{:02x}{:02x}".format(r*51, g*51, b*51)
+    grey = 8 + (n - 232) * 10
+    return "#{0:02x}{0:02x}{0:02x}".format(grey)
 
 _FMT_DEFAULT = QTextCharFormat()
 _FMT_DEFAULT.setForeground(QColor("#e2e8f0"))
@@ -134,10 +250,12 @@ class TerminalTab(QWidget):
         self.text_area = WatermarkTerminal(self)
         lay.addWidget(self.text_area)
 
+        # Persistent ANSI colour state (carries across read() boundaries)
+        self._ansi_state = _AnsiState()
+
         # Shell process setup
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
-        env["NO_COLOR"] = "1"
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["PYTHONUNBUFFERED"] = "1"
         env["BLOOM_JAIL"] = self.jail_root
@@ -229,12 +347,11 @@ class TerminalTab(QWidget):
         except BlockingIOError:
             return
 
-        text = _strip_ansi(raw)
-        self._stdout_buf += text
-        
+        self._stdout_buf += raw
+
         # Split using standard splitlines
         lines = self._stdout_buf.splitlines(keepends=True)
-        
+
         # If the last line doesn't end with a newline but contains __BLOOM_DONE__,
         # we process the whole buffer now instead of waiting.
         if lines and not lines[-1].endswith("\n") and not lines[-1].endswith("\r"):
@@ -245,20 +362,63 @@ class TerminalTab(QWidget):
         else:
             self._stdout_buf = ""
 
-        display = []
+        sentinel_lines = []
+        display_chunks = []  # list of (text, _AnsiState snapshot)
+
         for line in lines:
             lower_line = line.lower()
             if "password for" in lower_line or "password:" in lower_line:
                 self.awaiting_password = True
 
             if "__BLOOM_DONE__" in line:
-                self._parse_sentinel(line)
+                sentinel_lines.append(line)
             else:
-                display.append(line)
+                # Parse ANSI colour codes in this line, appending (text, fmt) pairs
+                self._parse_ansi_line(line, display_chunks)
 
-        out = "".join(display)
-        if out:
-            self._insert_colored(out, QColor("#e2e8f0"))
+        self._flush_ansi_chunks(display_chunks)
+
+        for line in sentinel_lines:
+            self._parse_sentinel(line)
+
+    def _parse_ansi_line(self, text: str, out: list):
+        """Split text on ANSI sequences and append (plain_text, fmt) tuples to out."""
+        parts = _ANSI_SPLIT_RE.split(text)
+        for part in parts:
+            if not part:
+                continue
+            if part == "\r":
+                # Carriage return — move to start of current prompt line (ignore for now)
+                continue
+            if part.startswith("\x1b["):
+                letter = part[-1]
+                inner  = part[2:-1]  # content between ESC[ and the final letter
+                if letter == "m":    # SGR — colour/attr
+                    raw_params = inner if inner else "0"
+                    try:
+                        params = [int(x) for x in raw_params.split(";") if x != ""]
+                    except ValueError:
+                        params = [0]
+                    self._ansi_state.apply_sgr(params)
+                # All other CSI sequences (cursor moves, erase, etc.) are ignored visually
+                continue
+            if part.startswith("\x1b"):
+                continue  # charset etc.
+            # Plain text chunk — record with current colour state
+            out.append((part, self._ansi_state.to_fmt()))
+
+    def _flush_ansi_chunks(self, chunks: list):
+        """Write (text, fmt) pairs into the QTextEdit cursor."""
+        if not chunks:
+            return
+        cursor = self.text_area.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        for text, fmt in chunks:
+            cursor.setCharFormat(fmt)
+            cursor.insertText(text)
+        cursor.setCharFormat(_FMT_DEFAULT)
+        self.text_area.setTextCursor(cursor)
+        self.text_area.ensureCursorVisible()
 
     def _parse_sentinel(self, line: str):
         self.is_running = False
