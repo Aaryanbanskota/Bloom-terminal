@@ -9,7 +9,7 @@ import os
 
 # App metadata
 APP_NAME = "Bloom Terminal"
-APP_VERSION = "1.0.0"
+APP_VERSION = "0.1.0-beta"
 APP_AUTHOR = "Bloom"
 
 # XP formula constants

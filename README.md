@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/Aaryanbanskota/Bloom-terminal/releases">
-    <img src="https://img.shields.io/github/v/release/Aaryanbanskota/Bloom-terminal?color=ff6eb4&label=version&style=for-the-badge" alt="Version"/>
+    <img src="https://img.shields.io/badge/version-v0.1.0--beta-ff6eb4?style=for-the-badge" alt="Version"/>
   </a>
   <a href="https://github.com/Aaryanbanskota/Bloom-terminal/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Aaryanbanskota/Bloom-terminal?color=c084fc&style=for-the-badge" alt="License"/>

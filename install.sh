@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  Bloom Terminal — One-command installer
-#  Usage:
-#    git clone https://github.com/Aaryanbanskota/Bloom-terminal.git
-#    cd Bloom-terminal
-#    bash install.sh
+#  🌸 Bloom Terminal — Multi-Distribution Installer & Service Configurator
+#  Supports: apt (Debian/Ubuntu), dnf (RHEL/Fedora), pacman (Arch), zypper (SUSE)
 # ─────────────────────────────────────────────────────────────────────────────
 
-set -e  # exit on any error
+set -e
 
 BOLD="\033[1m"
 GREEN="\033[1;32m"
@@ -28,63 +25,100 @@ echo "  ██████╔╝██║     ██║   ██║██║   �
 echo "  ██╔══██╗██║     ██║   ██║██║   ██║██║╚██╔╝██║"
 echo "  ██████╔╝███████╗╚██████╔╝╚██████╔╝██║ ╚═╝ ██║"
 echo "  ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝"
-echo -e "${RESET}  Terminal — Installer\n"
+echo -e "${RESET}  Universal Terminal Installer (v0.1.0-beta)\n"
 
-# ── 1. Check Python ───────────────────────────────────────────────────────────
-step "Checking Python version"
-if ! command -v python3 &>/dev/null; then
-    fail "Python 3 not found. Install it with: sudo apt install python3 python3-pip python3-venv"
-fi
-PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
-PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
-if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 8 ]; }; then
-    fail "Python 3.8+ required. Found: $PY_VER"
-fi
-ok "Python $PY_VER found"
+# ── 1. Detect Package Manager and OS ──────────────────────────────────────────
+step "Detecting package manager and OS distribution"
 
-# ── 2. System dependencies ────────────────────────────────────────────────────
-step "Checking system dependencies"
+OS_NAME=""
+PKG_MANAGER=""
+INSTALL_CMD=""
 
-MISSING=()
-
-# Qt platform plugins need libxcb
-if ! python3 -c "import PyQt5" &>/dev/null 2>&1; then
-    if command -v apt-get &>/dev/null; then
-        echo "  Installing Qt system libs..."
-        sudo apt-get install -y -q \
-            python3-pyqt5 \
-            python3-pyqt5.qtmultimedia \
-            libxcb-xinerama0 \
-            libxcb-icccm4 \
-            libxcb-image0 \
-            libxcb-keysyms1 \
-            libxcb-randr0 \
-            libxcb-render-util0 \
-            libgstreamer1.0-0 \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good \
-            gstreamer1.0-alsa \
-            zenity 2>/dev/null || warn "Some system libs may be missing"
-    else
-        warn "apt-get not available — install Qt5 + zenity manually if needed"
-    fi
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS_NAME=$NAME
 fi
 
-# zenity (native folder picker — avoids Qt dialog crashes)
-if ! command -v zenity &>/dev/null; then
-    if command -v apt-get &>/dev/null; then
-        echo "  Installing zenity..."
-        sudo apt-get install -y -q zenity 2>/dev/null || warn "Could not install zenity"
-    else
-        warn "zenity not found — folder picker will use tkinter fallback"
-    fi
+if command -v apt-get &>/dev/null; then
+    PKG_MANAGER="apt"
+    INSTALL_CMD="sudo apt-get install -y"
+elif command -v dnf &>/dev/null; then
+    PKG_MANAGER="dnf"
+    INSTALL_CMD="sudo dnf install -y"
+elif command -v pacman &>/dev/null; then
+    PKG_MANAGER="pacman"
+    INSTALL_CMD="sudo pacman -S --noconfirm"
+elif command -v zypper &>/dev/null; then
+    PKG_MANAGER="zypper"
+    INSTALL_CMD="sudo zypper install -y"
+else
+    warn "Unsupported distribution/package manager. You will need to install system dependencies manually."
 fi
 
-ok "System dependencies ready"
+ok "Detected $OS_NAME using $PKG_MANAGER"
 
-# ── 3. Virtual environment ────────────────────────────────────────────────────
-step "Setting up Python virtual environment"
+# ── 2. Install System Dependencies ────────────────────────────────────────────
+step "Installing system dependencies"
+
+if [ -n "$PKG_MANAGER" ]; then
+    case "$PKG_MANAGER" in
+        apt)
+            echo "Running apt update and package installation..."
+            sudo apt-get update -q
+            $INSTALL_CMD \
+                python3-pyqt5 \
+                python3-pyqt5.qtmultimedia \
+                libxcb-xinerama0 \
+                libxcb-icccm4 \
+                libxcb-image0 \
+                libxcb-keysyms1 \
+                libxcb-randr0 \
+                libxcb-render-util0 \
+                libgstreamer1.0-0 \
+                gstreamer1.0-plugins-base \
+                gstreamer1.0-plugins-good \
+                gstreamer1.0-alsa \
+                zenity \
+                python3-venv \
+                python3-pip \
+                python3-tk
+            ;;
+        dnf)
+            echo "Running dnf installation..."
+            $INSTALL_CMD \
+                python3-qt5 \
+                zenity \
+                python3-tkinter \
+                gstreamer1-plugins-base \
+                gstreamer1-plugins-good
+            ;;
+        pacman)
+            echo "Running pacman installation..."
+            $INSTALL_CMD \
+                python-pyqt5 \
+                zenity \
+                tk \
+                gstreamer \
+                gst-plugins-base \
+                gst-plugins-good
+            ;;
+        zypper)
+            echo "Running zypper installation..."
+            $INSTALL_CMD \
+                python3-qt5 \
+                zenity \
+                python3-tk \
+                gstreamer-plugins-base \
+                gstreamer-plugins-good
+            ;;
+    esac
+    ok "System packages installed successfully"
+else
+    warn "Skipped system dependency installation (manual installation required)"
+fi
+
+# ── 3. Setup Python Virtual Environment ────────────────────────────────────────
+step "Setting up virtual environment"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
     ok "Virtual environment created"
@@ -94,13 +128,9 @@ fi
 
 source venv/bin/activate
 
-# ── 4. Upgrade pip quietly ────────────────────────────────────────────────────
-step "Upgrading pip"
+# ── 4. Upgrade pip and Install Python packages ────────────────────────────────
+step "Installing Python packages inside virtual environment"
 pip install --upgrade pip --quiet
-ok "pip up to date"
-
-# ── 5. Install Python dependencies ───────────────────────────────────────────
-step "Installing Python packages"
 pip install --quiet \
     "PyQt5>=5.15.0" \
     "pycryptodome>=3.10.0" \
@@ -110,34 +140,65 @@ pip install --quiet \
     "psutil>=5.9.0" \
     "requests>=2.28.0"
 
-# Try multimedia support (optional — gracefully skipped if unavailable)
+# Optional PyQt5 QtMultimedia packages support
 pip install --quiet "PyQt5-Qt5" 2>/dev/null || true
+ok "Python packages configured successfully"
 
-ok "Python packages installed"
+# ── 5. Create Desktop Launcher and Binary Symlink ─────────────────────────────
+step "Registering 'bloom' command and desktop launcher"
 
-# ── 6. Create run script ──────────────────────────────────────────────────────
-step "Creating launch script"
-cat > bloom.sh << 'EOF'
+# Create launch wrapper in repo
+LAUNCH_SCRIPT="$(pwd)/bloom.sh"
+cat > "$LAUNCH_SCRIPT" << EOF
 #!/usr/bin/env bash
-cd "$(dirname "$0")"
+cd "$(pwd)"
 source venv/bin/activate
-# Suppress XDG_SESSION_TYPE warning on mixed Wayland/X11 systems
 export QT_QPA_PLATFORM=xcb
 export PYTHONPATH="$(pwd)"
-exec python3 -m bloom "$@"
+exec python3 -m bloom "\$@"
 EOF
-chmod +x bloom.sh
-ok "Launch script created: ./bloom.sh"
+chmod +x "$LAUNCH_SCRIPT"
 
-# ── 7. Done ───────────────────────────────────────────────────────────────────
+# Register global bin symlink if /usr/local/bin exists and is writable, or fallback to ~/.local/bin
+BIN_DIR="/usr/local/bin"
+if [ -w "$BIN_DIR" ]; then
+    sudo ln -sf "$LAUNCH_SCRIPT" "$BIN_DIR/bloom"
+    ok "Global terminal command registered: type 'bloom' anywhere!"
+else
+    LOCAL_BIN="$HOME/.local/bin"
+    mkdir -p "$LOCAL_BIN"
+    ln -sf "$LAUNCH_SCRIPT" "$LOCAL_BIN/bloom"
+    warn "Could not write to $BIN_DIR. Symlinked to $LOCAL_BIN/bloom instead."
+    warn "Ensure $LOCAL_BIN is in your PATH."
+fi
+
+# Create custom desktop file
+DESKTOP_DIR="$HOME/.local/share/applications"
+mkdir -p "$DESKTOP_DIR"
+DESKTOP_FILE="$DESKTOP_DIR/bloom-terminal.desktop"
+LOGO_PATH="$(pwd)/bloom/assets/bloom-terminal-logo.png"
+
+cat > "$DESKTOP_FILE" << EOF
+[Desktop Entry]
+Version=0.1.0-beta
+Type=Application
+Name=Bloom Terminal
+Comment=A beautifully crafted, gamified, sandboxed desktop terminal emulator.
+Exec=$LAUNCH_SCRIPT
+Icon=$LOGO_PATH
+Terminal=false
+Categories=System;TerminalEmulator;Utility;
+StartupNotify=true
+EOF
+chmod +x "$DESKTOP_FILE"
+ok "Desktop application launcher created: $DESKTOP_FILE"
+
+# ── 6. Done ───────────────────────────────────────────────────────────────────
 echo -e "\n${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${GREEN}${BOLD}  ✅  Bloom Terminal installed successfully!${RESET}"
+echo -e "${GREEN}${BOLD}  ✅  Bloom Terminal installation complete!${RESET}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
-echo -e "  Run Bloom Terminal with:"
-echo -e "  ${BOLD}  ./bloom.sh${RESET}"
-echo ""
-echo -e "  Or manually:"
-echo -e "  ${BOLD}  source venv/bin/activate${RESET}"
-echo -e "  ${BOLD}  python3 -m bloom${RESET}"
+echo -e "  You can now run Bloom Terminal by:"
+echo -e "  1. Typing ${BOLD}bloom${RESET} in any terminal session."
+echo -e "  2. Finding ${BOLD}Bloom Terminal${RESET} in your Applications menu."
 echo ""

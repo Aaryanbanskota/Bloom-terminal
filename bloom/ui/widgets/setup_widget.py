@@ -162,19 +162,65 @@ class SetupWidget(QWidget):
             """)
 
     def select_directory(self):
-        dialog = QFileDialog(self, "Choose Base Directory")
-        dialog.setFileMode(QFileDialog.Directory)
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
-        dialog.setStyleSheet("""
-            QFileDialog, QWidget { color: white; background-color: #1a202c; }
-            QListView, QTreeView, QHeaderView { background: #0f1219; color: white; }
-            QPushButton { background: #7c6af7; color: white; border-radius: 4px; padding: 5px 12px; }
-        """)
-        if dialog.exec_():
-            files = dialog.selectedFiles()
-            if files and files[0]:
-                self.selected_dir = files[0]
-                self._update_dir_label_style()
+        # Fallback helper similar to the song player to avoid crashes on Wayland/X11 systems
+        import subprocess, shutil
+
+        folder = ""
+        # 1. zenity
+        if shutil.which("zenity"):
+            try:
+                r = subprocess.run(
+                    ["zenity", "--file-selection", "--directory", "--title=Choose Base Directory"],
+                    capture_output=True, text=True, timeout=300
+                )
+                if r.returncode == 0:
+                    folder = r.stdout.strip()
+            except Exception:
+                pass
+
+        # 2. kdialog
+        if not folder and shutil.which("kdialog"):
+            try:
+                r = subprocess.run(
+                    ["kdialog", "--getexistingdirectory", os.path.expanduser("~"), "--title", "Choose Base Directory"],
+                    capture_output=True, text=True, timeout=300
+                )
+                if r.returncode == 0:
+                    folder = r.stdout.strip()
+            except Exception:
+                pass
+
+        # 3. tkinter
+        if not folder:
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                folder = filedialog.askdirectory(title="Choose Base Directory")
+                root.destroy()
+            except Exception:
+                pass
+
+        # 4. Qt fallback (only if absolutely no other picker exists)
+        if not folder:
+            dialog = QFileDialog(self, "Choose Base Directory")
+            dialog.setFileMode(QFileDialog.Directory)
+            dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+            dialog.setStyleSheet("""
+                QFileDialog, QWidget { color: white; background-color: #1a202c; }
+                QListView, QTreeView, QHeaderView { background: #0f1219; color: white; }
+                QPushButton { background: #7c6af7; color: white; border-radius: 4px; padding: 5px 12px; }
+            """)
+            if dialog.exec_():
+                files = dialog.selectedFiles()
+                if files and files[0]:
+                    folder = files[0]
+
+        if folder:
+            self.selected_dir = folder
+            self._update_dir_label_style()
 
     def save_setup(self):
         name = self.name_input.text().strip()
