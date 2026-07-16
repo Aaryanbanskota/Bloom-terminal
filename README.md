@@ -107,21 +107,23 @@ sequenceDiagram
 
 ## 🚀 Quick Start
 
-### ⚡ Recommended — One-line launcher
+### 🌸 Recommended — One-Command Installer
+
+To install Bloom Terminal, automatically download the latest release, register the `bloom` command, and create a desktop application launcher, run:
 
 ```bash
-chmod +x bloom_runner.sh
-./bloom_runner.sh
+curl -fsSL https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
 ```
 
-The `bloom_runner.sh` script handles **everything**:
-- ✅ Creates and activates a Python virtual environment
-- ✅ Installs all missing dependencies
-- ✅ Detects Wayland vs X11 and sets the right Qt platform
-- ✅ Silences background socket thread warnings
-- ✅ Launches the app
+or using `wget`:
 
-### 🔧 Manual Setup
+```bash
+wget -qO- https://raw.githubusercontent.com/Aaryanbanskota/Bloom-terminal/main/install.sh | bash
+```
+
+### 🔧 Manual Setup (Developers)
+
+If you'd like to clone the repository and run Bloom Terminal manually:
 
 ```bash
 # 1. Clone the repo
