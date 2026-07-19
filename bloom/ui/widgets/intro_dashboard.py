@@ -180,7 +180,9 @@ class ProfileWidget(QWidget):
 
 # ── Running Programs Widget ───────────────────────────────────────────────
 class RunningProgramsWidget(QWidget):
-    """Shows real running processes with the circular logo representing the user's avatar."""
+    """Shows real running processes. Shows up to 10 processes."""
+
+    MAX_PROCS = 10  # ponytail: raised from 4; ceiling: no virtualized list
 
     def __init__(self, parent_dashboard=None, parent=None):
         super().__init__(parent)
@@ -194,8 +196,8 @@ class RunningProgramsWidget(QWidget):
 
     def _build_ui(self):
         self._lay = QVBoxLayout(self)
-        self._lay.setContentsMargins(12, 12, 12, 12)
-        self._lay.setSpacing(8)
+        self._lay.setContentsMargins(12, 10, 12, 10)
+        self._lay.setSpacing(6)
 
         hdr = QLabel("Running Programs")
         hdr.setFont(QFont("Georgia", 12, QFont.Bold))
@@ -215,7 +217,7 @@ class RunningProgramsWidget(QWidget):
         self._proc_container.setStyleSheet("background: transparent;")
         self._proc_lay = QVBoxLayout(self._proc_container)
         self._proc_lay.setContentsMargins(0, 0, 0, 0)
-        self._proc_lay.setSpacing(6)
+        self._proc_lay.setSpacing(4)
         self._scroll.setWidget(self._proc_container)
         self._lay.addWidget(self._scroll, 1)
 
@@ -235,30 +237,25 @@ class RunningProgramsWidget(QWidget):
         try:
             for p in psutil.process_iter(["pid", "name", "cpu_percent", "status"]):
                 try:
-                    if p.info["status"] == psutil.STATUS_RUNNING:
-                        procs.append(p.info)
+                    info = p.info
+                    procs.append(info)
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
         except Exception:
             pass
 
-        procs.sort(key=lambda x: x.get("cpu_percent", 0), reverse=True)
-        shown = procs[:4] if procs else []
+        # Show running first, then fall back to any process
+        running = [p for p in procs if p.get("status") == psutil.STATUS_RUNNING]
+        running.sort(key=lambda x: x.get("cpu_percent", 0) or 0, reverse=True)
+        shown = running[:self.MAX_PROCS]
 
         if not shown:
-            try:
-                for p in list(psutil.process_iter(["pid", "name"]))[:4]:
-                    try:
-                        shown.append(p.info)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            shown = procs[:self.MAX_PROCS]
 
         for info in shown:
             row = self._make_proc_row(
                 name=info.get("name", "unknown"),
-                cpu=info.get("cpu_percent", 0),
+                cpu=info.get("cpu_percent", 0) or 0,
             )
             self._proc_lay.addWidget(row)
 
@@ -497,16 +494,16 @@ class IntroDashboard(QWidget):
         cent_lay.addWidget(self.avatar_widget, 0, Qt.AlignCenter)
 
         # ── Password / unlock field ──
+        # Public data (avatar, xp, level, username) is always visible above.
+        # Only the password input is gated.
         from bloom.security.encryption import SecurityManager
         self.sec = SecurityManager()
         self.is_locked = self.sec.is_locked()
+        self._failed_attempts = 0
+        self._lockout_timer = None
+        self._lockout_time_left = 0
 
-        self.pass_edit = QLineEdit()
-        self.pass_edit.setEchoMode(QLineEdit.Password)
-        self.pass_edit.setAlignment(Qt.AlignCenter)
-        self.pass_edit.setPlaceholderText("- - - -")
-        self.pass_edit.setMaximumWidth(220)
-        self.pass_edit.setStyleSheet("""
+        self._pass_style_normal = """
             QLineEdit {
                 background-color: #111827;
                 border: 1.5px solid #4a5568;
@@ -518,17 +515,40 @@ class IntroDashboard(QWidget):
                 letter-spacing: 6px;
             }
             QLineEdit:focus { border-color: #ef4444; }
-        """)
+        """
+        self._pass_style_error = """
+            QLineEdit {
+                background-color: #1f0a0a;
+                border: 2px solid #ef4444;
+                border-radius: 18px;
+                padding: 8px 18px;
+                color: white;
+                font-family: 'Georgia', serif;
+                font-size: 17px;
+                letter-spacing: 6px;
+            }
+        """
+
+        self.pass_edit = QLineEdit()
+        self.pass_edit.setEchoMode(QLineEdit.Password)
+        self.pass_edit.setAlignment(Qt.AlignCenter)
+        self.pass_edit.setPlaceholderText("Enter password")
+        self.pass_edit.setMaxLength(4)
+        self.pass_edit.setMaximumWidth(240)
+        self.pass_edit.setStyleSheet(self._pass_style_normal)
         self.pass_edit.returnPressed.connect(self.attempt_unlock)
         cent_lay.addWidget(self.pass_edit, 0, Qt.AlignCenter)
 
+        # Status label shows either "click to enter" or error message
         self.pulsing_lbl = QLabel("Click anywhere to enter →")
         self.pulsing_lbl.setStyleSheet("color: #6b7898; font-size: 13px;")
         self.pulsing_lbl.setAlignment(Qt.AlignCenter)
         cent_lay.addWidget(self.pulsing_lbl)
 
         if self.is_locked:
-            self.pulsing_lbl.setVisible(False)
+            self.pulsing_lbl.setVisible(True)
+            self.pulsing_lbl.setText("🔒  Enter password to unlock")
+            self.pulsing_lbl.setStyleSheet("color: #ef4444; font-size: 12px;")
             self.pass_edit.setVisible(True)
             QTimer.singleShot(100, self.pass_edit.setFocus)
         else:
@@ -583,28 +603,66 @@ class IntroDashboard(QWidget):
         return card
 
     def attempt_unlock(self):
+        if self._lockout_timer and self._lockout_timer.isActive():
+            return
         password = self.pass_edit.text()
+        if not password:
+            return
         if self.sec.decrypt_for_access(password):
+            self._failed_attempts = 0
             self.is_locked = False
             self.pass_edit.setVisible(False)
             self.pulsing_lbl.setVisible(True)
             self.pulsing_lbl.setText("✅  Unlocked! Click anywhere to enter →")
+            self.pulsing_lbl.setStyleSheet("color: #4ade80; font-size: 13px;")
             if self.parent_app and hasattr(self.parent_app, "on_database_unlocked"):
                 self.parent_app.on_database_unlocked()
         else:
-            self.pass_edit.setStyleSheet("""
-                QLineEdit {
-                    background-color: #111827;
-                    border: 2px solid #ef4444;
-                    border-radius: 18px;
-                    padding: 8px 18px;
-                    color: white;
-                    font-family: 'Georgia', serif;
-                    font-size: 17px;
-                    letter-spacing: 6px;
-                }
-            """)
+            self._failed_attempts += 1
+            self.pass_edit.setStyleSheet(self._pass_style_error)
             self.pass_edit.clear()
+            if self._failed_attempts >= 4:
+                self.start_lockout()
+            else:
+                attempts_left = 4 - self._failed_attempts
+                msg = f"❌  Wrong password — {attempts_left} attempt{'s' if attempts_left != 1 else ''} left"
+                self.pulsing_lbl.setText(msg)
+                self.pulsing_lbl.setStyleSheet("color: #ef4444; font-size: 12px;")
+                self.pulsing_lbl.setVisible(True)
+                # Reset border style after 2s so user can try again
+                QTimer.singleShot(2000, lambda: self.pass_edit.setStyleSheet(self._pass_style_normal))
+
+    def start_lockout(self):
+        self.pass_edit.setEnabled(False)
+        self.pass_edit.setStyleSheet(self._pass_style_error)
+        self._lockout_time_left = 30
+        self.update_lockout_ui()
+        
+        self._lockout_timer = QTimer(self)
+        self._lockout_timer.timeout.connect(self.tick_lockout)
+        self._lockout_timer.start(1000)
+
+    def tick_lockout(self):
+        self._lockout_time_left -= 1
+        if self._lockout_time_left <= 0:
+            self._lockout_timer.stop()
+            self._lockout_timer = None
+            self.pass_edit.setEnabled(True)
+            self.pass_edit.setStyleSheet(self._pass_style_normal)
+            self.pass_edit.setPlaceholderText("Enter password")
+            self.pass_edit.clear()
+            self._failed_attempts = 0
+            self.pulsing_lbl.setText("🔒  Enter password to unlock")
+            self.pulsing_lbl.setStyleSheet("color: #ef4444; font-size: 12px;")
+            self.pass_edit.setFocus()
+        else:
+            self.update_lockout_ui()
+
+    def update_lockout_ui(self):
+        msg = f"⛔ Locked out. Try again in {self._lockout_time_left}s"
+        self.pulsing_lbl.setText(msg)
+        self.pulsing_lbl.setStyleSheet("color: #ef4444; font-size: 12px;")
+        self.pass_edit.setPlaceholderText(f"Locked ({self._lockout_time_left}s)")
 
     def _update_clock(self):
         now = datetime.now()

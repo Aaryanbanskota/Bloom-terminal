@@ -2,7 +2,7 @@
 
 > This file is the **single source of truth** for any AI or developer picking up this project.
 > Updated after every structural or functional change.
-> Last updated: **2026-07-16** (Session: music folder fix + threading overhaul + install.sh)
+> Last updated: **2026-07-19** (Session: shortcuts, messenger web pings, auto-suggest plugin)
 
 ---
 
@@ -569,6 +569,7 @@ The installation process is split into two components to facilitate a seamless, 
 | 35 | 2026-07-16 | **Fix: `clear` and `exit` commands** | Intercepted `clear`/`cls` natively in `eventFilter` to wipe the `QTextEdit` directly (ANSI clear codes were being stripped). Intercepted `exit`/`logout` to gracefully close the current tab via `close_tab()`. | `bloom/terminal/terminal.py` |
 | 36 | 2026-07-16 | **Fix: XP/Level never saves or loads** | Fixed silent no-op in `update_user_stats` — added upsert fallback so data is written even before first setup. Fixed `load_user_data` to restore XP/level from DB even when `base_dir` is missing. Fixed `ProfileWidget.refresh()` to display level alongside XP. Added live `refresh_user()` call in `add_xp()` so the intro dashboard updates in real-time after every command. | `bloom/storage/database.py`, `bloom/app.py`, `bloom/ui/widgets/intro_dashboard.py` |
 | 37 | 2026-07-16 | **Fix: CLI color output renders as plain text** | Replaced `_strip_ansi` + flat color rendering with a full ANSI SGR parser. Implemented `_AnsiState` class to track fg/bg/bold/italic/underline/reverse across PTY read() boundaries. Added `_256_color()` for xterm-256 palette. Added `_parse_ansi_line()` and `_flush_ansi_chunks()` methods. Removed `NO_COLOR=1` from shell env so tools like `ls`, `git`, `grep` emit real colors. Now supports: standard 8/16 colors, bright colors (90-97), 256-color (38;5;n), true-color (38;2;r;g;b), bold, italic, underline, reverse video. | `bloom/terminal/terminal.py` |
+| 38 | 2026-07-19 | Shortcuts, Messenger pings, Auto-Suggest plugin | Added `bloom-shortcut` manager, supported `bloom --name` unquoted command shortcuts with internal recursion, implemented unique localStorage user pings in messenger, and integrated `AutoSuggestPlugin` into terminal tab. | `terminal.py`, `messenger.py`, `shortcut_manager.py`, `plugins/auto_suggest.py` |
 
 ---
 

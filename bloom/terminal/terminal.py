@@ -292,6 +292,12 @@ class TerminalTab(QWidget):
 
         self._write_prompt()
         self.text_area.installEventFilter(self)
+        
+        # Instantiate auto-suggest plugin
+        from bloom.plugins.auto_suggest import AutoSuggestPlugin
+        self.auto_suggest = AutoSuggestPlugin(self)
+        self.text_area.textChanged.connect(self.auto_suggest.on_text_changed)
+        
         self._schedule_hint()
 
     def _setup_notifier(self):
@@ -453,6 +459,38 @@ class TerminalTab(QWidget):
 
     def _handle_bloom_command(self, command: str) -> bool:
         cmd = " ".join(command.strip().split()).lower()
+        raw_cmd = command.strip()  # preserve case for password extraction
+
+        # bloom-message '<password>' — encrypted bluetooth messenger
+        if raw_cmd.lower().startswith("bloom-message"):
+            suffix = raw_cmd[len("bloom-message"):].strip()
+            if suffix.startswith('"') and suffix.endswith('"') and len(suffix) >= 2:
+                password = suffix[1:-1]
+            elif suffix.startswith("'") and suffix.endswith("'") and len(suffix) >= 2:
+                password = suffix[1:-1]
+            else:
+                password = suffix if suffix else "pass"
+            self._open_messenger(password)
+            return True
+
+        # bloom-shortcut — custom command shortcut manager
+        if raw_cmd.lower() == "bloom-shortcut":
+            self._open_shortcut_manager()
+            return True
+
+        # bloom-0068devpage-acc"<password>" — dev inspector window
+        if raw_cmd.lower().startswith("bloom-0068devpage-acc"):
+            suffix = raw_cmd[len("bloom-0068devpage-acc"):].strip()
+            # strip surrounding quotes if present
+            if suffix.startswith('"') and suffix.endswith('"') and len(suffix) >= 2:
+                password = suffix[1:-1]
+            elif suffix.startswith("'") and suffix.endswith("'") and len(suffix) >= 2:
+                password = suffix[1:-1]
+            else:
+                password = suffix
+
+            self._open_dev_page(password)
+            return True
 
         if cmd == "bloom profile":
             self.app_ref.show_profile()
@@ -461,6 +499,14 @@ class TerminalTab(QWidget):
 
         if cmd == "bloom lock":
             self.app_ref.lock_app()
+            return True
+
+        if cmd == "bloom messenger" or cmd == "bloom message":
+            self._open_messenger("pass")
+            return True
+
+        if cmd == "bloom shortcut":
+            self._open_shortcut_manager()
             return True
 
         if cmd == "bloom doctor":
@@ -608,12 +654,21 @@ class TerminalTab(QWidget):
                 f"  bloom profile     →  Open profile / XP / perks dialog\n"
                 f"  bloom intro       →  Replay the intro splash screen\n"
                 f"  bloom setup       →  Re-run first-time setup (name + folder)\n"
+                f"  bloom lock        →  🔒  Lock the app (requires password to re-open)\n"
                 f"\n"
                 f"  {sep2}\n"
                 f"  WINDOW & TABS\n"
                 f"  {sep2}\n"
                 f"  bloom terminal    →  Open a brand-new Bloom window\n"
                 f"  bloom tab         →  Add a new tab in this window\n"
+                f"\n"
+                f"  {sep2}\n"
+                f"  MESSAGING & SHORTCUTS\n"
+                f"  {sep2}\n"
+                f"  bloom messenger   →  💬  Open LAN messenger (WiFi peer-to-peer)\n"
+                f"  bloom-message     →  💬  Open LAN messenger (alias, no password needed)\n"
+                f"  bloom-shortcut    →  ⚡  Open shortcut manager — create custom commands\n"
+                f"  bloom --\"<name>\"  →  ⚡  Run a saved shortcut by name\n"
                 f"\n"
                 f"  {sep2}\n"
                 f"  EXTRA TOOLS  (open in their own window)\n"
@@ -635,6 +690,11 @@ class TerminalTab(QWidget):
                 f"  bloom help        →  Show this reference\n"
                 f"  bloom doctor      →  🩺  Run system diagnostics check\n"
                 f"\n"
+                f"  {sep2}\n"
+                f"  DEVELOPER\n"
+                f"  {sep2}\n"
+                f"  bloom-0068devpage-acc\"<pw>\"  →  🔬  Open developer DB inspector\n"
+                f"\n"
                 f"  {sep}\n"
                 f"  Sandbox root  :  {self.jail_root}\n"
                 f"  Shell         :  {SHELL_EXE}\n"
@@ -644,7 +704,108 @@ class TerminalTab(QWidget):
             self._write_prompt()
             return True
 
+        # Check user-defined shortcuts: bloom --name or bloom --"name"
+        import re as _re
+        _sc_match = _re.fullmatch(r'bloom\s+--(?:([^\s"]+)|"([^"]+)")', cmd)
+        if _sc_match:
+            sc_name = _sc_match.group(1) or _sc_match.group(2)
+            from bloom.ui.windows.shortcut_manager import find_shortcut
+            sc = find_shortcut(sc_name)
+            if sc is None:
+                # Check if it exists but deactivated
+                from bloom.ui.windows.shortcut_manager import _load as _sc_load
+                all_sc = _sc_load()
+                deactivated = any(
+                    s["name"].lower() == sc_name.lower() and not s.get("active", True)
+                    for s in all_sc
+                )
+                if deactivated:
+                    self._insert_colored(
+                        f"[Shortcut] ⚠️  bloom --\"{sc_name}\" is deactivated. "
+                        f"Re-activate it in bloom-shortcut.\n",
+                        QColor("#f59e0b")
+                    )
+                else:
+                    self._insert_error(
+                        f"[Shortcut] ❌  No shortcut named '{sc_name}'. "
+                        f"Create one with bloom-shortcut.\n"
+                    )
+                self._write_prompt()
+                return True
+            self._insert_colored(
+                f"[Shortcut] ⚡  Running: {sc['command']}\n",
+                QColor("#4ade80")
+            )
+            # If the shortcut command itself is a bloom command, execute internally!
+            sc_cmd = sc['command'].strip()
+            if sc_cmd.lower().startswith("bloom"):
+                # Handle it directly using handle_bloom_command recursively
+                if not self._handle_bloom_command(sc_cmd):
+                    self._insert_error(f"bloom: unknown command '{sc_cmd}'.\n")
+                    self._write_prompt()
+            else:
+                self._run_command(sc["command"])
+            return True
+
         return False
+
+    def _open_messenger(self, password: str):
+        try:
+            from bloom.ui.windows.messenger import EncryptedMessengerWindow
+            self._msg_win = EncryptedMessengerWindow(password)
+            self._msg_win.show()
+            self._insert_colored("[Bloom Message] 💬 LAN Messenger opened.\n", QColor("#4ade80"))
+        except Exception as e:
+            self._insert_error(f"[Bloom Message] Failed to open: {e}\n")
+        self._write_prompt()
+
+    def _open_shortcut_manager(self):
+        try:
+            from bloom.ui.windows.shortcut_manager import ShortcutManagerWindow
+            self._shortcut_win = ShortcutManagerWindow()
+            self._shortcut_win.show()
+            self._insert_colored("[Bloom Shortcut] ⚡ Shortcut manager opened.\n", QColor("#c084fc"))
+        except Exception as e:
+            self._insert_error(f"[Bloom Shortcut] Failed to open: {e}\n")
+        self._write_prompt()
+
+    def _open_dev_page(self, password: str):
+        """Verify password then open the dev inspector window."""
+        from bloom.security.encryption import SecurityManager
+        sec = SecurityManager()
+        db_conn = getattr(self.app_ref, 'db_conn', None)
+
+        # If db is not locked, allow access directly (dev mode: any password ok when unlocked)
+        if db_conn is not None:
+            # DB is unlocked, open directly
+            self._launch_dev_page()
+            return
+
+        # DB is locked — verify password
+        if not sec.verify_password(password):
+            self._insert_error("[Bloom DevPage] ❌  Invalid password. Access denied.\n")
+            self._write_prompt()
+            return
+
+        # Decrypt temporarily for access
+        if sec.decrypt_for_access(password):
+            if self.app_ref and hasattr(self.app_ref, 'on_database_unlocked'):
+                self.app_ref.on_database_unlocked()
+            self._launch_dev_page()
+        else:
+            self._insert_error("[Bloom DevPage] ❌  Could not decrypt database. Access denied.\n")
+            self._write_prompt()
+
+    def _launch_dev_page(self):
+        try:
+            from bloom.ui.windows.dev_page import DevPage
+            self._dev_win = DevPage()
+            self._dev_win.resize(1080, 700)
+            self._dev_win.show()
+            self._insert_colored("[Bloom DevPage] 🔬  Developer Inspector opened.\n", QColor("#7c6af7"))
+        except Exception as e:
+            self._insert_error(f"[Bloom DevPage] Failed to open: {e}\n")
+        self._write_prompt()
 
     def _run_doctor_diagnostic(self):
         import sys
@@ -887,6 +1048,9 @@ class TerminalTab(QWidget):
         key  = event.key()
         mods = event.modifiers()
 
+        if hasattr(self, 'auto_suggest') and self.auto_suggest.handle_key_press(key, mods):
+            return True
+
         if self.awaiting_password:
             if key == Qt.Key_V and (mods & Qt.ControlModifier):
                 import PyQt5.QtWidgets as QtWidgets
@@ -949,6 +1113,23 @@ class TerminalTab(QWidget):
                     idx = self.app_ref.tab_widget.indexOf(self)
                     if idx >= 0:
                         self.app_ref.close_tab(idx)
+                return True
+
+            # bloom-message '<password>' — encrypted messenger (starts with bloom- not bloom<space>)
+            if command.strip().lower().startswith("bloom-message"):
+                self._handle_bloom_command(command)
+                return True
+
+            # bloom-shortcut — shortcut manager
+            if command.strip().lower() == "bloom-shortcut":
+                self._handle_bloom_command(command)
+                return True
+
+
+
+            # bloom-0068devpage-acc"<password>" — dev inspector (starts with bloom- not bloom<space>)
+            if command.strip().lower().startswith("bloom-0068devpage-acc"):
+                self._handle_bloom_command(command)
                 return True
 
             tokens = command.split()

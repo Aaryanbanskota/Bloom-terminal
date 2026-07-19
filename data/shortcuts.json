@@ -1,0 +1,14 @@
+[
+  {
+    "name": "test",
+    "command": "ls",
+    "active": true,
+    "created_at": 1784482462.5333955
+  },
+  {
+    "name": "pramesh",
+    "command": "bloom browser https://www.youtube.com/watch?v=V_cZa8Ice2w&list=RDi6bI8MRkxBc&index=2",
+    "active": false,
+    "created_at": 1784480990.6904323
+  }
+]
